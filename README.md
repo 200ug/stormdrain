@@ -18,9 +18,10 @@ Running the tool inside a project directory creates `.stormrdain/` there to hold
 Planned (approximate) interface:
 
 ```
-stormdrain new <profile>    # build new image and start container for cwd
-stormdrain enter <profile>  # attach a shell to a running container
-stormdrain down <profile>   # tear down
+stormdrain new <profile>        # build new image and start container for cwd
+stormdrain enter                # attach a shell to a container matching cwd
+stormdrain down                 # shutdown cwd's container (if it exists and is running)
+stormdrain list [-f <filter>]   # list all stormdrain labeled containers (optionally basic container name filtering)
 ```
 
 ---
