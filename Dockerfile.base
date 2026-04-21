@@ -1,0 +1,36 @@
+FROM docker.io/library/buildpack-deps:trixie
+
+# NOTE: uid & gid are just defaults (guesses) and should be overwritten at build time to ensure sensible 
+#       permissions on the file mounts (i.e. 'podman build --build-arg UID=$(id -u) --build-arg GID=$(id -g)')
+ARG USERNAME=dev
+ARG UID=1000
+ARG GID=1000
+
+RUN apt update && apt install -y --no-install-recommends \
+    sudo \
+    zsh \
+    less \
+    iproute2 \
+    locales \
+    && rm -rf /var/lib/apt/lists/* \
+    && sed -i '/en_US.UTF-8/s/^# //' /etc/locale.gen \
+    && locale-gen
+
+ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+
+RUN groupadd --gid $GID $USERNAME \
+    && useradd --uid $UID --gid $GID --create-home --shell /bin/zsh $USERNAME \
+    && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
+
+USER $USERNAME
+
+# {{PROFILE_PKGS}}
+# {{PROFILE_INSTALLERS}}
+# {{PROFILE_DOTFILES}}
+
+WORKDIR /home/$USERNAME
+
+# keep the container running without attached session or proc
+CMD ["sleep", "infinity"]
+
