@@ -1,0 +1,167 @@
+package internal
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+)
+
+// TODO: add function that starts the podman machine if it's not running (podman machine start)
+
+func PodmanCreate(spec *PodmanSpec) error {
+	if err := PodmanBuild(spec); err != nil {
+		return fmt.Errorf("podman build failed: %w", err)
+	}
+	if err := PodmanRun(spec); err != nil {
+		return fmt.Errorf("podman run failed: %w", err)
+	}
+
+	return nil
+}
+
+func PodmanBuild(spec *PodmanSpec) error {
+	args := []string{
+		"build",
+		"-t", spec.ImageTag,
+		"-f", filepath.Join(spec.BuildCtx, "Dockerfile.sd"),
+	}
+	for k, v := range spec.BuildArgs {
+		args = append(args, "--build-arg", fmt.Sprintf("%s=%s", k, v))
+	}
+	args = append(args, spec.BuildCtx)
+
+	cmd := exec.Command("podman", args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}
+
+// Creates and runs a new container with the specified mounts and volumes.
+// If a container with the same name already exists (i.e. is stopped),
+// it is started instead.
+func PodmanRun(spec *PodmanSpec) error {
+	if containerExists(spec.ContainerName) {
+		return podmanStart(spec.ContainerName)
+	}
+
+	args := []string{
+		"run",
+		"-d",
+		"--name", spec.ContainerName,
+		"--hostname", spec.Hostname,
+		"--label", "stormdrain",
+	}
+	if len(spec.DirectMounts) > 0 {
+		args = append(args, "-w", fmt.Sprintf("/home/dev/%s", spec.ContainerName))
+	}
+	for _, m := range spec.DirectMounts {
+		args = append(args, "-v", fmt.Sprintf("%s:%s", m.HostPath, m.ContainerPath))
+	}
+	for _, v := range spec.VirtualVolumes {
+		args = append(args, "-v", fmt.Sprintf("%s:%s", v.Name, v.Path))
+	}
+	args = append(args, spec.ImageTag)
+
+	cmd := exec.Command("podman", args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}
+
+// Ensures the container is running (starting it if stopped), then attaches
+// an interactive shell session.
+func PodmanAttach(containerName, shell string) error {
+	if containerExists(containerName) {
+		if err := podmanStart(containerName); err != nil {
+			return fmt.Errorf("podman start failed: %w", err)
+		}
+	} else {
+		return fmt.Errorf("container %q does not exist", containerName)
+	}
+
+	cmd := exec.Command("podman", "exec", "-it", containerName, shell)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}
+
+func PodmanExec(containerName, shell string) error {
+	cmd := exec.Command("podman", "exec", "-it", containerName, shell)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}
+
+func PodmanList(filter string, stats bool) error {
+	// TODO: implement -s stats output (image size, uptime, resource usage, etc.)
+	args := []string{"ps", "-a", "--filter", "label=stormdrain"}
+	if filter != "" {
+		args = append(args, "--filter", filter)
+	}
+	cmd := exec.Command("podman", args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}
+
+func PodmanStop(containerName string, kill bool) error {
+	action := "stop"
+	if kill {
+		action = "kill"
+	}
+	cmd := exec.Command("podman", action, containerName)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func PodmanRemove(containerName string) error {
+	cmd := exec.Command("podman", "rm", "-f", containerName)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func PodmanPurge() error {
+	cmd := exec.Command("podman", "ps", "-a", "-q", "--filter", "label=stormdrain")
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to list stormdrain containers: %w", err)
+	}
+	ids := strings.Fields(strings.TrimSpace(string(output)))
+	if len(ids) == 0 {
+		fmt.Println("no stormdrain containers found")
+		return nil
+	}
+
+	args := append([]string{"rm", "-f"}, ids...)
+	rmCmd := exec.Command("podman", args...)
+	rmCmd.Stdout = os.Stdout
+	rmCmd.Stderr = os.Stderr
+	return rmCmd.Run()
+}
+
+func containerExists(name string) bool {
+	cmd := exec.Command("podman", "inspect", name, "--format", "{{.Name}}")
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+
+	return cmd.Run() == nil
+}
+
+func podmanStart(name string) error {
+	cmd := exec.Command("podman", "start", name)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}
