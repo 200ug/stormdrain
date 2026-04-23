@@ -1,0 +1,15 @@
+{
+    "name": "default-arm64",
+    "description": "default profile (nvim v0.12.1, arm64)",
+    "shell": "/bin/zsh",
+    "packages": ["ripgrep", "zsh-autosuggestions", "fzf", "tmux", "tree"],
+    "installers": [
+        "curl -Lo /tmp/nvim-linux-arm64.tar.gz https://github.com/neovim/neovim/releases/download/v0.12.1/nvim-linux-arm64.tar.gz && tar -xzf /tmp/nvim-linux-arm64.tar.gz -C /tmp && cp -r /tmp/nvim-linux-arm64/* ~/.local/"
+    ],
+    "dotfiles": [
+        { "src": "~/.config/nvim", "dst": "~/.config/nvim", "exclude": ["plugin"] },
+        { "src": "~/.config/tmux", "dst": "~/.config/tmux" },
+        { "src": "~/.zshrc", "dst": "~/." },
+        { "src": "~/.config/zsh", "dst": "~/.config/zsh" }
+    ]
+}
