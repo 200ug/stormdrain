@@ -22,7 +22,11 @@ RUN GRP=$(getent group $GID | cut -d: -f1) && \
     if [ -z "$GRP" ]; then groupadd --gid $GID $USERNAME && GRP=$USERNAME; fi && \
     useradd --uid $UID --gid $GRP --create-home --shell /bin/zsh $USERNAME \
     && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
-    && chmod 0440 /etc/sudoers.d/$USERNAME
+    && chmod 0440 /etc/sudoers.d/$USERNAME \
+    && mkdir -p /home/$USERNAME/.local/bin \
+    && chown $USERNAME:$GRP /home/$USERNAME/.local /home/$USERNAME/.local/bin
+
+ENV PATH="/home/$USERNAME/.local/bin:$PATH"
 
 USER $USERNAME
 
