@@ -9,6 +9,13 @@ import (
 	"codeberg.org/2ug/stormdrain/internal"
 )
 
+/*
+	TODO:
+
+	- handle removal of virtual volumes ("workspace" -> "virtual_volumes" in profiles) if necessary
+	- handle volume naming conflicts (e.g. add randomized suffix to name & persist it to spec?)
+*/
+
 func deleteContainer(containerName string) {
 	projectPath, err := internal.ContainerProjectPath(containerName)
 	if err != nil {
