@@ -9,11 +9,11 @@ import (
 
 const versionCode = "v0.1 (2026-04-22)"
 
-const usage = `usage: stormdrain <command> [flags]
+const usage = `[?] usage: stormdrain <command> [flags]
 
 commands:
   new <profile>             create a new container from a profile
-  enter                     attach a shell to a container matching cwd
+  enter [name]              attach a shell to a container matching cwd or given container name
   close [name] [-f]         close the container matching cwd or given container name (optionally SIGKILL)
   rm [name]                 remove the container matching cwd or given container name
   ls [-f <filter>] [-s]     list all stormdrain containers (optional filtering and stats)
@@ -32,7 +32,7 @@ func main() {
 	case "new":
 		cmd.CmdNew(os.Args[2:])
 	case "enter":
-		cmd.CmdEnter()
+		cmd.CmdEnter(os.Args[2:])
 	case "close":
 		cmd.CmdClose(os.Args[2:])
 	case "rm":
