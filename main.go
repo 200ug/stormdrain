@@ -16,7 +16,7 @@ commands:
   enter                     attach a shell to a container matching cwd
   close [name] [-f]         close the container matching cwd or given container name (optionally SIGKILL)
   rm [name]                 remove the container matching cwd or given container name
-  list [-f <filter>] [-s]   list all stormdrain containers (optional filtering and stats)
+  ls [-f <filter>] [-s]     list all stormdrain containers (optional filtering and stats)
   purge                     shut down and delete *all* stormdrain containers
   help                      print this usage message
   version                   print current build version
@@ -37,13 +37,13 @@ func main() {
 		cmd.CmdClose(os.Args[2:])
 	case "rm":
 		cmd.CmdDelete(os.Args[2:])
-	case "list":
+	case "ls":
 		cmd.CmdList(os.Args[2:])
 	case "purge":
 		cmd.CmdDeleteAll()
-	case "version":
+	case "version", "v":
 		fmt.Printf("stormdrain %s\n", versionCode)
-	case "help":
+	case "help", "h":
 		fmt.Print(usage)
 	default:
 		fmt.Print(usage)
