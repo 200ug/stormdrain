@@ -136,23 +136,14 @@ func PodmanRemove(containerName string) error {
 	return cmd.Run()
 }
 
-func PodmanPurge() error {
+func StormdrainContainerIDs() ([]string, error) {
 	cmd := exec.Command("podman", "ps", "-a", "-q", "--filter", "label=stormdrain")
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("failed to list stormdrain containers: %w", err)
+		return nil, fmt.Errorf("failed to list stormdrain containers: %w", err)
 	}
 	ids := strings.Fields(strings.TrimSpace(string(output)))
-	if len(ids) == 0 {
-		fmt.Println("no stormdrain containers found")
-		return nil
-	}
-
-	args := append([]string{"rm", "-f"}, ids...)
-	rmCmd := exec.Command("podman", args...)
-	rmCmd.Stdout = os.Stdout
-	rmCmd.Stderr = os.Stderr
-	return rmCmd.Run()
+	return ids, nil
 }
 
 func containerExists(name string) bool {
