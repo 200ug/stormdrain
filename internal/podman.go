@@ -118,7 +118,7 @@ func PodmanStop(containerName string, kill bool) error {
 		action = "kill"
 	}
 	cmd := exec.Command("podman", action, containerName)
-	cmd.Stdout = os.Stdout
+	cmd.Stdout = nil
 	cmd.Stderr = os.Stderr
 
 	return cmd.Run()
@@ -126,7 +126,7 @@ func PodmanStop(containerName string, kill bool) error {
 
 func PodmanRemove(containerName string) error {
 	cmd := exec.Command("podman", "rm", "-f", containerName)
-	cmd.Stdout = os.Stdout
+	cmd.Stdout = nil
 	cmd.Stderr = os.Stderr
 
 	return cmd.Run()
