@@ -20,11 +20,11 @@ Running the tool inside a project directory creates `.stormdrain/` (gitignored):
 ## usage
 
 ```
-usage: stormdrain <command> [flags]
+[?] usage: stormdrain <command> [flags]
 
 commands:
   new <profile>             create a new container from a profile
-  enter                     attach a shell to a container matching cwd
+  enter [name]              attach a shell to a container matching cwd or given container name
   close [name] [-f]         close the container matching cwd or given container name (optionally SIGKILL)
   rm [name]                 remove the container matching cwd or given container name
   ls [-f <filter>] [-s]     list all stormdrain containers (optional filtering and stats)
