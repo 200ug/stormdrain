@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-// TODO: add function to ensure podman is installed (and in PATH)
+// TODO: add function to ensure podman is installed (and in PATH) and a machine is running
 
 var Hostnames = []string{
 	"akarso",

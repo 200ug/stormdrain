@@ -11,17 +11,19 @@ import (
 // TODO: add function that starts the podman machine if it's not running (podman machine start)
 
 func PodmanCreate(spec *PodmanSpec) error {
-	if err := PodmanBuild(spec); err != nil {
+	fmt.Println("[~] building container image")
+	if err := podmanBuild(spec); err != nil {
 		return fmt.Errorf("podman build failed: %w", err)
 	}
-	if err := PodmanRun(spec); err != nil {
+	fmt.Println("[~] running the newly built container")
+	if err := podmanRun(spec); err != nil {
 		return fmt.Errorf("podman run failed: %w", err)
 	}
 
 	return nil
 }
 
-func PodmanBuild(spec *PodmanSpec) error {
+func podmanBuild(spec *PodmanSpec) error {
 	args := []string{
 		"build",
 		"-t", spec.ImageTag,
@@ -42,8 +44,8 @@ func PodmanBuild(spec *PodmanSpec) error {
 // Creates and runs a new container with the specified mounts and volumes.
 // If a container with the same name already exists (i.e. is stopped),
 // it is started instead.
-func PodmanRun(spec *PodmanSpec) error {
-	if containerExists(spec.ContainerName) {
+func podmanRun(spec *PodmanSpec) error {
+	if ContainerExists(spec.ContainerName) {
 		return podmanStart(spec.ContainerName)
 	}
 
@@ -76,12 +78,12 @@ func PodmanRun(spec *PodmanSpec) error {
 // Ensures the container is running (starting it if stopped), then attaches
 // an interactive shell session.
 func PodmanAttach(containerName, shell string) error {
-	if containerExists(containerName) {
+	if ContainerExists(containerName) {
 		if err := podmanStart(containerName); err != nil {
 			return fmt.Errorf("podman start failed: %w", err)
 		}
 	} else {
-		return fmt.Errorf("container %q does not exist", containerName)
+		return fmt.Errorf("container '%q' does not exist", containerName)
 	}
 
 	cmd := exec.Command("podman", "exec", "-it", containerName, shell)
@@ -93,16 +95,8 @@ func PodmanAttach(containerName, shell string) error {
 	if _, ok := err.(*exec.ExitError); ok {
 		return nil
 	}
+
 	return err
-}
-
-func PodmanExec(containerName, shell string) error {
-	cmd := exec.Command("podman", "exec", "-it", containerName, shell)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	return cmd.Run()
 }
 
 func PodmanList(filter string, stats bool) error {
@@ -126,6 +120,7 @@ func PodmanStop(containerName string, kill bool) error {
 	cmd := exec.Command("podman", action, containerName)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
 	return cmd.Run()
 }
 
@@ -133,20 +128,22 @@ func PodmanRemove(containerName string) error {
 	cmd := exec.Command("podman", "rm", "-f", containerName)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
 	return cmd.Run()
 }
 
-func StormdrainContainerIDs() ([]string, error) {
+func ListContainerIDs() ([]string, error) {
 	cmd := exec.Command("podman", "ps", "-a", "-q", "--filter", "label=stormdrain")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list stormdrain containers: %w", err)
 	}
 	ids := strings.Fields(strings.TrimSpace(string(output)))
+
 	return ids, nil
 }
 
-func containerExists(name string) bool {
+func ContainerExists(name string) bool {
 	cmd := exec.Command("podman", "inspect", name, "--format", "{{.Name}}")
 	cmd.Stdout = nil
 	cmd.Stderr = nil
@@ -158,12 +155,12 @@ func ContainerProjectPath(name string) (string, error) {
 	cmd := exec.Command("podman", "inspect", name, "--format", "{{index .Config.Labels \"stormdrain.project-path\"}}")
 	out, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("failed to inspect container %q: %w", name, err)
+		return "", fmt.Errorf("failed to inspect container '%q': %w", name, err)
 	}
 
 	path := strings.TrimSpace(string(out))
 	if path == "" {
-		return "", fmt.Errorf("container %q has no stormdrain.project-path label", name)
+		return "", fmt.Errorf("container '%q' has no stormdrain.project-path label", name)
 	}
 
 	return path, nil

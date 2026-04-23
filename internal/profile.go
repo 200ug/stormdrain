@@ -17,7 +17,7 @@ func init() {
 	var err error
 	userHome, err = os.UserHomeDir()
 	if err != nil {
-		fmt.Printf("[!] user home could not be resolved: %s\n", err)
+		fmt.Printf("[!] failed to resolve user home directory: %s\n", err)
 		os.Exit(1)
 	}
 	globalConfigDir = filepath.Join(userHome, ".config", "stormdrain")
@@ -156,9 +156,9 @@ func (p *Profile) StageDotfiles(cwd string) error {
 
 		matches, err := filepath.Glob(src)
 		if err != nil {
-			return fmt.Errorf("dotfile glob failed for %s: %w", df.SourcePattern, err)
+			return fmt.Errorf("dotfile glob failed for '%s': %w", df.SourcePattern, err)
 		} else if len(matches) == 0 {
-			return fmt.Errorf("dotfile glob pattern %s matched no files", df.SourcePattern)
+			return fmt.Errorf("dotfile glob pattern '%s' matched no files", df.SourcePattern)
 		}
 
 		for _, m := range matches {

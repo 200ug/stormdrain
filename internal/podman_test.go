@@ -7,8 +7,8 @@ import (
 // container exists
 
 func TestContainerExistsReturnsFalseWithoutPodman(t *testing.T) {
-	exists := containerExists("stormdrain-nonexistent-container-xyz")
+	exists := ContainerExists("stormdrain-nonexistent-container-xyz")
 	if exists {
-		t.Error("expected containerExists to return false for a container that should not exist")
+		t.Error("expected ContainerExists to return false for a container that should not exist")
 	}
 }
