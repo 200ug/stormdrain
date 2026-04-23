@@ -18,8 +18,9 @@ RUN apt update && apt install -y --no-install-recommends \
 
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 
-RUN groupadd --gid $GID $USERNAME \
-    && useradd --uid $UID --gid $GID --create-home --shell /bin/zsh $USERNAME \
+RUN GRP=$(getent group $GID | cut -d: -f1) && \
+    if [ -z "$GRP" ]; then groupadd --gid $GID $USERNAME && GRP=$USERNAME; fi && \
+    useradd --uid $UID --gid $GRP --create-home --shell /bin/zsh $USERNAME \
     && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
     && chmod 0440 /etc/sudoers.d/$USERNAME
 
