@@ -16,22 +16,32 @@ func CmdDelete(args []string) {
 	}
 	fs.Parse(args)
 
-	containerName := ""
-	if fs.NArg() > 0 {
-		containerName = fs.Arg(0)
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Printf("[!] failed resolving cwd: %v\n", err)
+		os.Exit(1)
 	}
 
-	if containerName == "" {
-		cwd, err := os.Getwd()
-		if err != nil {
-			fmt.Printf("[!] failed resolving cwd: %v\n", err)
-			os.Exit(1)
-		}
+	var containerName string
+	if fs.NArg() > 0 {
+		containerName = fs.Arg(0)
+	} else {
 		containerName = filepath.Base(cwd)
 	}
+	projectPath, err := internal.ContainerProjectPath(containerName)
+	if err != nil {
+		fmt.Printf("[!] failed to resolve project path: %v\n", err)
+		os.Exit(1)
+	}
+	sdDir := filepath.Join(projectPath, ".stormdrain")
 
 	if err := internal.PodmanRemove(containerName); err != nil {
 		fmt.Printf("[!] failed to remove container %s: %v\n", containerName, err)
+		os.Exit(1)
+	}
+
+	if err = os.RemoveAll(sdDir); err != nil {
+		fmt.Printf("[!] failed to remove data directory %s: %v\n", sdDir, err)
 		os.Exit(1)
 	}
 }

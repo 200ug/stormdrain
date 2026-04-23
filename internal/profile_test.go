@@ -285,6 +285,57 @@ func TestStageDotfilesGlobPattern(t *testing.T) {
 	}
 }
 
+func TestStageDotfilesWithExclude(t *testing.T) {
+	origUserHome := userHome
+	t.Cleanup(func() { userHome = origUserHome })
+
+	homeDir := t.TempDir()
+	userHome = homeDir
+
+	nvimDir := filepath.Join(homeDir, ".config", "nvim")
+	pluginDir := filepath.Join(nvimDir, "plugin")
+	luaDir := filepath.Join(nvimDir, "lua")
+	os.MkdirAll(pluginDir, 0755)
+	os.MkdirAll(luaDir, 0755)
+	os.WriteFile(filepath.Join(nvimDir, "init.lua"), []byte("init"), 0644)
+	os.WriteFile(filepath.Join(luaDir, "plugins.lua"), []byte("plugins"), 0644)
+	os.WriteFile(filepath.Join(pluginDir, "packer_compiled.lua"), []byte("compiled"), 0644)
+
+	workDir := t.TempDir()
+
+	p := &Profile{
+		Dotfiles: []Dotfile{
+			{SourcePattern: "~/.config/nvim", DestinationPath: "~/.config/nvim", Exclude: []string{"plugin"}},
+		},
+	}
+
+	if err := p.StageDotfiles(workDir); err != nil {
+		t.Fatal(err)
+	}
+
+	dotsDir := filepath.Join(workDir, ".stormdrain", "dots")
+
+	initData, err := os.ReadFile(filepath.Join(dotsDir, ".config", "nvim", "init.lua"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(initData) != "init" {
+		t.Errorf("init.lua: got %q, want %q", string(initData), "init")
+	}
+
+	pluginsData, err := os.ReadFile(filepath.Join(dotsDir, ".config", "nvim", "lua", "plugins.lua"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(pluginsData) != "plugins" {
+		t.Errorf("plugins.lua: got %q, want %q", string(pluginsData), "plugins")
+	}
+
+	if _, err := os.Stat(filepath.Join(dotsDir, ".config", "nvim", "plugin")); !os.IsNotExist(err) {
+		t.Error("plugin directory should be excluded")
+	}
+}
+
 func TestCleanupStagedDotfiles(t *testing.T) {
 	workDir := t.TempDir()
 	dotsDir := filepath.Join(workDir, ".stormdrain", "dots")
@@ -444,6 +495,7 @@ func TestPodmanSpecRoundTrip(t *testing.T) {
 		Hostname:      "akarso",
 		ImageTag:      "stormdrain-golang-myproject",
 		Shell:         "/bin/zsh",
+		ProjectPath:   "/home/user/project",
 		BuildCtx:      "/tmp/.stormdrain",
 		DotfileDir:    "/tmp/.stormdrain/dots",
 		BuildArgs: map[string]string{
@@ -478,6 +530,9 @@ func TestPodmanSpecRoundTrip(t *testing.T) {
 	}
 	if loaded.Shell != original.Shell {
 		t.Errorf("Shell: got %q, want %q", loaded.Shell, original.Shell)
+	}
+	if loaded.ProjectPath != original.ProjectPath {
+		t.Errorf("ProjectPath: got %q, want %q", loaded.ProjectPath, original.ProjectPath)
 	}
 	if loaded.BuildArgs["UID"] != original.BuildArgs["UID"] {
 		t.Errorf("BuildArgs UID: got %q, want %q", loaded.BuildArgs["UID"], original.BuildArgs["UID"])

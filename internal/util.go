@@ -66,7 +66,7 @@ func RandomHostname() string {
 	return Hostnames[rand.IntN(len(Hostnames))]
 }
 
-func CopyDir(src, dst string) error {
+func CopyDir(src, dst string, exclude []string) error {
 	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -76,6 +76,17 @@ func CopyDir(src, dst string) error {
 		if err != nil {
 			return err
 		}
+
+		for _, pattern := range exclude {
+			matched, _ := filepath.Match(pattern, rel)
+			if matched {
+				if d.IsDir() {
+					return fs.SkipDir
+				}
+				return nil
+			}
+		}
+
 		target := filepath.Join(dst, rel)
 
 		if d.IsDir() {

@@ -24,8 +24,9 @@ func init() {
 }
 
 type Dotfile struct {
-	SourcePattern   string `json:"src"`
-	DestinationPath string `json:"dst"`
+	SourcePattern   string   `json:"src"`
+	DestinationPath string   `json:"dst"`
+	Exclude         []string `json:"exclude"`
 }
 
 type Workspace struct {
@@ -173,7 +174,7 @@ func (p *Profile) StageDotfiles(cwd string) error {
 			dstPath := filepath.Join(dotsDir, relToHome)
 
 			if info.IsDir() {
-				if err := CopyDir(m, dstPath); err != nil {
+				if err := CopyDir(m, dstPath, df.Exclude); err != nil {
 					return err
 				}
 			} else {
@@ -205,6 +206,7 @@ type PodmanSpec struct {
 	Hostname       string            `json:"hostname"`
 	ImageTag       string            `json:"image_tag"`
 	Shell          string            `json:"shell"`
+	ProjectPath    string            `json:"project_path"`
 	BuildCtx       string            `json:"-"`
 	DotfileDir     string            `json:"-"`
 	BuildArgs      map[string]string `json:"build_args"`
@@ -226,6 +228,7 @@ func (p *Profile) NewPodmanSpec(cwd string) (*PodmanSpec, error) {
 		Hostname:      RandomHostname(),
 		ImageTag:      fmt.Sprintf("stormdrain-%s-%s", p.Name, projName),
 		Shell:         shell,
+		ProjectPath:   cwd,
 		BuildCtx:      filepath.Join(cwd, ".stormdrain"),
 		DotfileDir:    filepath.Join(cwd, ".stormdrain", "dots"),
 		BuildArgs: map[string]string{

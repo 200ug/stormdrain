@@ -53,6 +53,7 @@ func PodmanRun(spec *PodmanSpec) error {
 		"--name", spec.ContainerName,
 		"--hostname", spec.Hostname,
 		"--label", "stormdrain",
+		"--label", fmt.Sprintf("stormdrain.project-path=%s", spec.ProjectPath),
 	}
 	if len(spec.DirectMounts) > 0 {
 		args = append(args, "-w", fmt.Sprintf("/home/dev/%s", spec.ContainerName))
@@ -88,7 +89,11 @@ func PodmanAttach(containerName, shell string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	return cmd.Run()
+	err := cmd.Run()
+	if _, ok := err.(*exec.ExitError); ok {
+		return nil
+	}
+	return err
 }
 
 func PodmanExec(containerName, shell string) error {
@@ -156,6 +161,21 @@ func containerExists(name string) bool {
 	cmd.Stderr = nil
 
 	return cmd.Run() == nil
+}
+
+func ContainerProjectPath(name string) (string, error) {
+	cmd := exec.Command("podman", "inspect", name, "--format", "{{index .Config.Labels \"stormdrain.project-path\"}}")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to inspect container %q: %w", name, err)
+	}
+
+	path := strings.TrimSpace(string(out))
+	if path == "" {
+		return "", fmt.Errorf("container %q has no stormdrain.project-path label", name)
+	}
+
+	return path, nil
 }
 
 func podmanStart(name string) error {
