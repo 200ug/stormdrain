@@ -13,7 +13,7 @@ func CmdList(args []string) {
 	filter := fs.String("f", "", "filter containers by name")
 	stats := fs.Bool("s", false, "show container statistics")
 	fs.Usage = func() {
-		fmt.Printf("usage: %s list [-f <filter>] [-s]\n", os.Args[0])
+		fmt.Println("[?] usage: stormdrain list [-f <filter>] [-s]")
 	}
 	fs.Parse(args)
 

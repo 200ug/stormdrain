@@ -13,7 +13,7 @@ func CmdClose(args []string) {
 	fs := flag.NewFlagSet("close", flag.ExitOnError)
 	force := fs.Bool("f", false, "send SIGKILL instead of SIGTERM")
 	fs.Usage = func() {
-		fmt.Printf("usage: %s close [name] [-f]\n", os.Args[0])
+		fmt.Println("[?] usage: stormdrain close [name] [-f]")
 	}
 	fs.Parse(args)
 
@@ -25,14 +25,22 @@ func CmdClose(args []string) {
 	if containerName == "" {
 		cwd, err := os.Getwd()
 		if err != nil {
-			fmt.Printf("[!] failed resolving cwd: %v\n", err)
+			fmt.Printf("[!] failed to resolve cwd: %v\n", err)
 			os.Exit(1)
 		}
 		containerName = filepath.Base(cwd)
 	}
 
-	if err := internal.PodmanStop(containerName, *force); err != nil {
-		fmt.Printf("[!] failed to close container %s: %v\n", containerName, err)
+	if !internal.ContainerExists(containerName) {
+		fmt.Printf("[!] container '%s' does not exist\n", containerName)
 		os.Exit(1)
 	}
+
+	fmt.Printf("[~] stopping container '%s'... ", containerName)
+	if err := internal.PodmanStop(containerName, *force); err != nil {
+		fmt.Println("failed")
+		fmt.Printf("[!] failed to close container '%s': %v\n", containerName, err)
+		os.Exit(1)
+	}
+	fmt.Println("done")
 }
