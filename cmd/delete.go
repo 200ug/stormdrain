@@ -17,6 +17,8 @@ import (
 */
 
 func deleteContainer(containerName string) {
+	// TODO: kill container first before deleting to speed the process up drastically
+
 	projectPath, err := internal.ContainerProjectPath(containerName)
 	if err != nil {
 		fmt.Printf("[!] failed to resolve project path for '%s': %v\n", containerName, err)
