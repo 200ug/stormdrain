@@ -84,6 +84,63 @@ func TestBuildDotfilesBlockEmpty(t *testing.T) {
 	}
 }
 
+// build dirs block
+
+func TestBuildDirsBlockEmpty(t *testing.T) {
+	p := &Profile{}
+	if result := p.buildDirsBlock("myproject"); result != "" {
+		t.Errorf("expected empty string for empty workspace, got %q", result)
+	}
+}
+
+func TestBuildDirsBlockWithWorkspace(t *testing.T) {
+	p := &Profile{
+		Workspace: Workspace{
+			DirectMounts: []string{"cmd", "go.mod"},
+			VirtualVolumes: []VirtualVolume{
+				{Name: "go-mod-cache", Path: "/go/pkg/mod"},
+			},
+		},
+	}
+	result := p.buildDirsBlock("myproject")
+	if !strings.Contains(result, "mkdir -p /home/dev/myproject /go/pkg/mod") {
+		t.Errorf("expected mkdir with both dirs, got %q", result)
+	}
+	if !strings.Contains(result, "chown -R $UID:$GID /home/$USERNAME") {
+		t.Errorf("expected recursive chown on /home/$USERNAME, got %q", result)
+	}
+	if !strings.Contains(result, "chown $UID:$GID /go/pkg/mod") {
+		t.Errorf("expected individual chown for /go/pkg/mod, got %q", result)
+	}
+}
+
+func TestBuildDirsBlockVirtualOnly(t *testing.T) {
+	p := &Profile{
+		Workspace: Workspace{
+			VirtualVolumes: []VirtualVolume{
+				{Name: "go-mod-cache", Path: "/go/pkg/mod"},
+				{Name: "go-build-cache", Path: "/home/dev/.cache/go-build"},
+			},
+		},
+	}
+	result := p.buildDirsBlock("myproject")
+	if strings.Contains(result, "/home/dev/myproject") {
+		t.Errorf("workdir should not appear without direct mounts, got %q", result)
+	}
+	if !strings.Contains(result, "/go/pkg/mod") || !strings.Contains(result, "/home/dev/.cache/go-build") {
+		t.Errorf("expected both virtual volume paths, got %q", result)
+	}
+	if !strings.Contains(result, "chown -R $UID:$GID /home/$USERNAME") {
+		t.Errorf("expected recursive chown on /home/$USERNAME, got %q", result)
+	}
+	if strings.Contains(result, "chown $UID:$GID /home/dev") {
+		t.Errorf("paths under /home/ should not get individual chown, got %q", result)
+	}
+	if !strings.Contains(result, "chown $UID:$GID /go/pkg/mod") {
+		t.Errorf("paths outside /home/ should get individual chown, got %q", result)
+	}
+}
+
 // substitution
 
 func TestDockerfileSubstitution(t *testing.T) {
@@ -106,6 +163,7 @@ USER dev
 # {{PROFILE_PKGS}}
 # {{PROFILE_INSTALLERS}}
 # {{PROFILE_DOTFILES}}
+# {{PROFILE_DIRS}}
 CMD ["sleep", "infinity"]
 `
 	if err := os.WriteFile(filepath.Join(configDir, "Dockerfile.base"), []byte(dockerfileBase), 0644); err != nil {
@@ -142,6 +200,9 @@ CMD ["sleep", "infinity"]
 	if strings.Contains(resultStr, "# {{PROFILE_DOTFILES}}") {
 		t.Error("PROFILE_DOTFILES marker not replaced")
 	}
+	if strings.Contains(resultStr, "# {{PROFILE_DIRS}}") {
+		t.Error("PROFILE_DIRS marker not replaced")
+	}
 	if !strings.Contains(resultStr, "RUN sudo apt update && sudo apt install -y --no-install-recommends") {
 		t.Error("packages block not present in output")
 	}
@@ -169,6 +230,7 @@ USER dev
 # {{PROFILE_PKGS}}
 # {{PROFILE_INSTALLERS}}
 # {{PROFILE_DOTFILES}}
+# {{PROFILE_DIRS}}
 CMD ["sleep", "infinity"]
 `
 	if err := os.WriteFile(filepath.Join(configDir, "Dockerfile.base"), []byte(dockerfileBase), 0644); err != nil {
@@ -469,6 +531,7 @@ func TestNewPodmanSpecDefaultShell(t *testing.T) {
 }
 
 func TestNewPodmanSpecMountPathNotExist(t *testing.T) {
+	os.Stdout = nil
 	workDir := t.TempDir()
 
 	p := &Profile{
@@ -478,9 +541,12 @@ func TestNewPodmanSpecMountPathNotExist(t *testing.T) {
 		},
 	}
 
-	_, err := p.NewPodmanSpec(workDir)
-	if err == nil {
-		t.Error("expected error for nonexistent mount path, got nil")
+	spec, err := p.NewPodmanSpec(workDir)
+	if err != nil {
+		t.Fatalf("expected nil error for nonexistent mount path, got %v", err)
+	}
+	if len(spec.DirectMounts) != 0 {
+		t.Errorf("expected DirectMounts to be empty, got %d entries", len(spec.DirectMounts))
 	}
 }
 

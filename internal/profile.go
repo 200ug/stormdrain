@@ -78,14 +78,17 @@ func (p *Profile) DockerfileSubstitution() error {
 		return err
 	}
 
-	res := strings.Replace(string(og), "# {{PROFILE_PKGS}}\n", p.buildPackagesBlock(), 1)
-	res = strings.Replace(res, "# {{PROFILE_INSTALLERS}}\n", p.buildInstallersBlock(), 1)
-	res = strings.Replace(res, "# {{PROFILE_DOTFILES}}\n", p.buildDotfilesBlock(), 1)
-
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
+	projName := filepath.Base(cwd)
+
+	res := strings.Replace(string(og), "# {{PROFILE_PKGS}}\n", p.buildPackagesBlock(), 1)
+	res = strings.Replace(res, "# {{PROFILE_INSTALLERS}}\n", p.buildInstallersBlock(), 1)
+	res = strings.Replace(res, "# {{PROFILE_DOTFILES}}\n", p.buildDotfilesBlock(), 1)
+	res = strings.Replace(res, "# {{PROFILE_DIRS}}\n", p.buildDirsBlock(projName), 1)
+
 	sdDir := filepath.Join(cwd, ".stormdrain")
 	if err := os.MkdirAll(sdDir, 0755); err != nil {
 		return err
@@ -119,6 +122,34 @@ func (p *Profile) buildInstallersBlock() string {
 	for _, inst := range p.Installers {
 		fmt.Fprintf(&b, "RUN %s\n", inst)
 	}
+	return b.String()
+}
+
+func (p *Profile) buildDirsBlock(projName string) string {
+	var dirs []string
+	if len(p.Workspace.DirectMounts) > 0 {
+		dirs = append(dirs, fmt.Sprintf("/home/dev/%s", projName))
+	}
+	for _, v := range p.Workspace.VirtualVolumes {
+		dirs = append(dirs, v.Path)
+	}
+	if len(dirs) == 0 {
+		return ""
+	}
+
+	b := strings.Builder{}
+	b.WriteString("RUN mkdir -p")
+	for _, d := range dirs {
+		fmt.Fprintf(&b, " %s", d)
+	}
+	b.WriteString(" && chown -R $UID:$GID /home/$USERNAME")
+	for _, d := range dirs {
+		if !strings.HasPrefix(d, "/home/") {
+			fmt.Fprintf(&b, " && chown $UID:$GID %s", d)
+		}
+	}
+	b.WriteString("\n")
+
 	return b.String()
 }
 
@@ -241,7 +272,8 @@ func (p *Profile) NewPodmanSpec(cwd string) (*PodmanSpec, error) {
 	for _, mount := range p.Workspace.DirectMounts {
 		hostPath := filepath.Join(cwd, mount)
 		if _, err := os.Stat(hostPath); err != nil {
-			return nil, err
+			fmt.Printf("[!] skipping direct mount '%s': path does not exist on host\n", mount)
+			continue
 		}
 		spec.DirectMounts = append(spec.DirectMounts, MountSpec{
 			HostPath:      hostPath,

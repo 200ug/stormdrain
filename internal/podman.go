@@ -64,7 +64,7 @@ func podmanRun(spec *PodmanSpec) error {
 		args = append(args, "-v", fmt.Sprintf("%s:%s", m.HostPath, m.ContainerPath))
 	}
 	for _, v := range spec.VirtualVolumes {
-		args = append(args, "-v", fmt.Sprintf("%s:%s", v.Name, v.Path))
+		args = append(args, "-v", fmt.Sprintf("%s:%s:U", v.Name, v.Path))
 	}
 	args = append(args, spec.ImageTag)
 

@@ -28,6 +28,7 @@ RUN GRP=$(getent group $GID | cut -d: -f1) && \
 
 ENV PATH="/home/$USERNAME/.local/bin:$PATH"
 
+# {{PROFILE_DIRS}}
 USER $USERNAME
 
 # {{PROFILE_PKGS}}
