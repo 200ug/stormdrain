@@ -6,7 +6,7 @@ Declarative JSON profiles for sandboxed development environments with Podman.
 
 Templates live in `~/.config/stormdrain/`:
 
-- `Dockerfile.base` acts as the base template image for all new containers. Placeholders (`{{PROFILE_PKGS}}`, `{{PROFILE_INSTALLERS}}`, and `{{PROFILE_DOTFILES}}`) are substituted with commands derived from the active profile.
+- `Dockerfile.base` acts as the base template image for all new containers. Placeholders (`{{PROFILE_PKGS}}`, `{{PROFILE_DIRS}}`, `{{PROFILE_INSTALLERS}}`, and `{{PROFILE_DOTFILES}}`) are substituted with commands derived from the active profile.
 - `profiles/` contains individual JSON profiles, each describing one environment (packages, toolchains, dotfile mounts, volumes, etc.). See `example_profiles/` for a few basic examples.
 
 This layout can be initialized and populated with the included samples via `scripts/init.sh`.
@@ -14,7 +14,7 @@ This layout can be initialized and populated with the included samples via `scri
 Running the tool inside a project directory creates `.stormdrain/` (gitignored):
 
 - `Dockerfile.sd` is the substituted Dockerfile generated from `Dockerfile.base` and the active profile.
-- `pod_spec.json` persists the container configuration (name, image tag, shell, mounts, volumes) for commands like `enter`, `close`, and `rm` to reference.
+- `pod_spec.json` persists the container configuration (name, image tag, shell, project mount, volumes, ports) for commands like `enter`, `close`, and `rm` to reference.
 - `dots/` is a temporary staging directory for dotfiles copied during the build process. It is cleaned up automatically after container creation.
 
 ## usage
