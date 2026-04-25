@@ -39,6 +39,11 @@ type VirtualVolume struct {
 	Path string `json:"path"`
 }
 
+type PortMap struct {
+	Host      int `json:"host"`
+	Container int `json:"container"`
+}
+
 type Profile struct {
 	Name        string    `json:"name"` // ideally matches the profile's filename for clarity
 	Description string    `json:"description"`
@@ -46,6 +51,7 @@ type Profile struct {
 	Packages    []string  `json:"packages"`
 	Installers  []string  `json:"installers"`
 	Dotfiles    []Dotfile `json:"dotfiles"`  // copied during container image building (i.e. globbing supported)
+	Ports       []PortMap `json:"ports"`     // host <-> container port mappings
 	Workspace   Workspace `json:"workspace"` // handled with live volume mounts
 }
 
@@ -243,6 +249,7 @@ type PodmanSpec struct {
 	BuildArgs      map[string]string `json:"build_args"`
 	DirectMounts   []MountSpec       `json:"direct_mounts"`
 	VirtualVolumes []VirtualVolume   `json:"virtual_volumes"`
+	Ports          []PortMap         `json:"ports"`
 }
 
 func (p *Profile) NewPodmanSpec(cwd string) (*PodmanSpec, error) {
@@ -281,6 +288,7 @@ func (p *Profile) NewPodmanSpec(cwd string) (*PodmanSpec, error) {
 		})
 	}
 	spec.VirtualVolumes = p.Workspace.VirtualVolumes
+	spec.Ports = p.Ports
 
 	return spec, nil
 }

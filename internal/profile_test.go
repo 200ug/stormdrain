@@ -550,6 +550,40 @@ func TestNewPodmanSpecMountPathNotExist(t *testing.T) {
 	}
 }
 
+func TestNewPodmanSpecWithPorts(t *testing.T) {
+	origWd, _ := os.Getwd()
+	t.Cleanup(func() { os.Chdir(origWd) })
+
+	workDir := t.TempDir()
+	os.Chdir(workDir)
+
+	p := &Profile{
+		Name:  "web",
+		Shell: "/bin/zsh",
+		Ports: []PortMap{
+			{Host: 8080, Container: 3000},
+			{Host: 5432, Container: 5432},
+		},
+	}
+
+	spec, err := p.NewPodmanSpec(workDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(spec.Ports) != 2 {
+		t.Fatalf("Ports: got %d, want 2", len(spec.Ports))
+	}
+	if spec.Ports[0].Host != 8080 || spec.Ports[0].Container != 3000 {
+		t.Errorf("Ports[0]: got host=%d container=%d, want host=8080 container=3000",
+			spec.Ports[0].Host, spec.Ports[0].Container)
+	}
+	if spec.Ports[1].Host != 5432 || spec.Ports[1].Container != 5432 {
+		t.Errorf("Ports[1]: got host=%d container=%d, want host=5432 container=5432",
+			spec.Ports[1].Host, spec.Ports[1].Container)
+	}
+}
+
 // spec round-trip
 
 func TestPodmanSpecRoundTrip(t *testing.T) {
@@ -573,6 +607,9 @@ func TestPodmanSpecRoundTrip(t *testing.T) {
 		},
 		VirtualVolumes: []VirtualVolume{
 			{Name: "go-mod-cache", Path: "/go/pkg/mod"},
+		},
+		Ports: []PortMap{
+			{Host: 8080, Container: 3000},
 		},
 	}
 
@@ -620,6 +657,13 @@ func TestPodmanSpecRoundTrip(t *testing.T) {
 	}
 	if loaded.DotfileDir != "" {
 		t.Errorf("DotfileDir should be excluded from serialization, got %q", loaded.DotfileDir)
+	}
+	if len(loaded.Ports) != len(original.Ports) {
+		t.Errorf("Ports length: got %d, want %d", len(loaded.Ports), len(original.Ports))
+	}
+	if loaded.Ports[0].Host != original.Ports[0].Host || loaded.Ports[0].Container != original.Ports[0].Container {
+		t.Errorf("Ports[0]: got host=%d container=%d, want host=%d container=%d",
+			loaded.Ports[0].Host, loaded.Ports[0].Container, original.Ports[0].Host, original.Ports[0].Container)
 	}
 }
 
