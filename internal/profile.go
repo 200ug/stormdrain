@@ -60,15 +60,22 @@ func LoadProfile(profileName string) (*Profile, error) {
 		profileName += ".json"
 	}
 	fp := filepath.Join(globalConfigDir, "profiles", profileName)
-	file, err := os.Open(fp)
+	return decodeProfile(fp)
+}
+
+func LoadProfileFromPath(path string) (*Profile, error) {
+	return decodeProfile(path)
+}
+
+func decodeProfile(path string) (*Profile, error) {
+	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
 	var profile Profile
-	parser := json.NewDecoder(file)
-	if err = parser.Decode(&profile); err != nil {
+	if err = json.NewDecoder(file).Decode(&profile); err != nil {
 		return nil, err
 	}
 

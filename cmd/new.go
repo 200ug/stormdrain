@@ -11,18 +11,24 @@ import (
 
 func CmdNew(args []string) {
 	fs := flag.NewFlagSet("new", flag.ExitOnError)
+	profilePath := fs.String("f", "", "path to profile JSON file")
 	fs.Usage = func() {
-		fmt.Println("[?] usage: stormdrain new <profile>")
+		fmt.Println("[?] usage: stormdrain new [-f <path>] <profile>")
 	}
 	fs.Parse(args)
-	if fs.NArg() != 1 {
-		fs.Usage()
-		os.Exit(1)
-	}
-	profileName := args[0]
 
-	// load profile from ~/.config/stormdrain/profiles/
-	profile, err := internal.LoadProfile(profileName)
+	var profile *internal.Profile
+	var err error
+
+	if *profilePath != "" {
+		profile, err = internal.LoadProfileFromPath(*profilePath)
+	} else {
+		if fs.NArg() != 1 {
+			fs.Usage()
+			os.Exit(1)
+		}
+		profile, err = internal.LoadProfile(fs.Arg(0))
+	}
 	if err != nil {
 		fmt.Printf("[!] failed to load profile: %v\n", err)
 		os.Exit(1)

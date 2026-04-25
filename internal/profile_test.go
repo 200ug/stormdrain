@@ -749,3 +749,41 @@ func TestLoadProfileNotFound(t *testing.T) {
 		t.Error("expected error for nonexistent profile, got nil")
 	}
 }
+
+func TestLoadProfileFromPath(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	profileData := Profile{
+		Name:        "frompath",
+		Description: "loaded via direct path",
+		Shell:       "/bin/zsh",
+		Packages:    []string{"ripgrep"},
+		Ports: []PortMap{
+			{Host: 8080, Container: 3000},
+		},
+	}
+	data, _ := json.Marshal(profileData)
+	fp := filepath.Join(tmpDir, "my-profile.json")
+	os.WriteFile(fp, data, 0644)
+
+	profile, err := LoadProfileFromPath(fp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile.Name != "frompath" {
+		t.Errorf("Name: got %q, want %q", profile.Name, "frompath")
+	}
+	if profile.Shell != "/bin/zsh" {
+		t.Errorf("Shell: got %q, want %q", profile.Shell, "/bin/zsh")
+	}
+	if len(profile.Ports) != 1 || profile.Ports[0].Host != 8080 {
+		t.Errorf("Ports: got %v, want [{Host:8080 Container:3000}]", profile.Ports)
+	}
+}
+
+func TestLoadProfileFromPathNotFound(t *testing.T) {
+	_, err := LoadProfileFromPath("/nonexistent/path/profile.json")
+	if err == nil {
+		t.Error("expected error for nonexistent path, got nil")
+	}
+}

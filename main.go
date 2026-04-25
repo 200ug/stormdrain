@@ -12,14 +12,14 @@ const versionCode = "v0.1 (2026-04-22)"
 const usage = `[?] usage: stormdrain <command> [flags]
 
 commands:
-  new <profile>             create a new container from a profile
-  enter [name]              attach a shell to a container matching cwd or given container name
-  close [name] [-f]         close the container matching cwd or given container name (optionally SIGKILL)
-  rm [name]                 remove the container matching cwd or given container name
-  ls [-f <filter>] [-s]     list all stormdrain containers (optional filtering and stats)
-  purge                     shut down and delete *all* stormdrain containers
-  help                      print this usage message
-  version                   print current build version
+  new [-f <path>] <profile>  create a new container from a profile (or profile file path)
+  enter [name]               attach a shell to a container matching cwd or given container name
+  close [name] [-f]          close the container matching cwd or given container name (optionally SIGKILL)
+  rm [name]                  remove the container matching cwd or given container name
+  ls [-f <filter>] [-s]      list all stormdrain containers (optional filtering and stats)
+  purge                      shut down and delete *all* stormdrain containers
+  help                       print this usage message
+  version                    print current build version
 `
 
 func main() {
