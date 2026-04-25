@@ -17,8 +17,6 @@ import (
 */
 
 func deleteContainer(containerName string) {
-	// TODO: kill container first before deleting to speed the process up drastically
-
 	projectPath, err := internal.ContainerProjectPath(containerName)
 	if err != nil {
 		fmt.Printf("[!] failed to resolve project path for '%s': %v\n", containerName, err)
@@ -29,7 +27,9 @@ func deleteContainer(containerName string) {
 		}
 	}
 
-	fmt.Printf("[~] removing container '%s'... ", containerName)
+	fmt.Printf("[~] killing and removing container '%s'... ", containerName)
+	// we can omit this error as we'll just fall back to shutting the container down in PodmanRemove
+	_ = internal.PodmanStop(containerName, true)
 	if err := internal.PodmanRemove(containerName); err != nil {
 		fmt.Println("failed")
 		fmt.Printf("[!] failed to remove container '%s': %v\n", containerName, err)
