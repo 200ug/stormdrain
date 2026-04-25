@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// TODO: add function that starts the podman machine if it's not running (podman machine start)
+// TODO: function that ensures podman is in PATH and the machine is running (startup if not)
 
 func PodmanCreate(spec *PodmanSpec) error {
 	fmt.Println("[~] building container image")
