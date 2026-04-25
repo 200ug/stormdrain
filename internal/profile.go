@@ -29,11 +29,6 @@ type Dotfile struct {
 	Exclude         []string `json:"exclude"`
 }
 
-type Workspace struct {
-	DirectMounts   []string        `json:"direct_mounts"`
-	VirtualVolumes []VirtualVolume `json:"virtual_volumes"`
-}
-
 type VirtualVolume struct {
 	Name string `json:"name"`
 	Path string `json:"path"`
@@ -45,14 +40,19 @@ type PortMap struct {
 }
 
 type Profile struct {
-	Name        string    `json:"name"` // ideally matches the profile's filename for clarity
-	Description string    `json:"description"`
-	Shell       string    `json:"shell"`
-	Packages    []string  `json:"packages"`
-	Installers  []string  `json:"installers"`
-	Dotfiles    []Dotfile `json:"dotfiles"`  // copied during container image building (i.e. globbing supported)
-	Ports       []PortMap `json:"ports"`     // host <-> container port mappings
-	Workspace   Workspace `json:"workspace"` // handled with live volume mounts
+	Name         string    `json:"name"` // ideally matches the profile's filename for clarity
+	Description  string    `json:"description"`
+	Shell        string    `json:"shell"`
+	Packages     []string  `json:"packages"`
+	Installers   []string  `json:"installers"`
+	Dotfiles     []Dotfile `json:"dotfiles"`      // copied during container image building (i.e. globbing supported)
+	ProjectMount *bool     `json:"project_mount"` // mount project directory into container (default true)
+	Ports        []PortMap `json:"ports"`         // host <-> container port mappings
+	VirtualVolumes []VirtualVolume `json:"virtual_volumes"`
+}
+
+func (p *Profile) IsProjectMounted() bool {
+	return p.ProjectMount == nil || *p.ProjectMount
 }
 
 func LoadProfile(profileName string) (*Profile, error) {
@@ -140,10 +140,10 @@ func (p *Profile) buildInstallersBlock() string {
 
 func (p *Profile) buildDirsBlock(projName string) string {
 	var dirs []string
-	if len(p.Workspace.DirectMounts) > 0 {
+	if p.IsProjectMounted() {
 		dirs = append(dirs, fmt.Sprintf("/home/dev/%s", projName))
 	}
-	for _, v := range p.Workspace.VirtualVolumes {
+	for _, v := range p.VirtualVolumes {
 		dirs = append(dirs, v.Path)
 	}
 	if len(dirs) == 0 {
@@ -239,11 +239,6 @@ func CleanupStagedDotfiles(cwd string) error {
 	return os.RemoveAll(filepath.Join(cwd, ".stormdrain", "dots"))
 }
 
-type MountSpec struct {
-	HostPath      string `json:"host_path"`
-	ContainerPath string `json:"container_path"`
-}
-
 // Build configuration for a new container image. Only used during build stage ('new' cmd).
 type PodmanSpec struct {
 	ContainerName  string            `json:"container_name"`
@@ -251,10 +246,10 @@ type PodmanSpec struct {
 	ImageTag       string            `json:"image_tag"`
 	Shell          string            `json:"shell"`
 	ProjectPath    string            `json:"project_path"`
+	ProjectMount   bool              `json:"project_mount"`
 	BuildCtx       string            `json:"-"`
 	DotfileDir     string            `json:"-"`
 	BuildArgs      map[string]string `json:"build_args"`
-	DirectMounts   []MountSpec       `json:"direct_mounts"`
 	VirtualVolumes []VirtualVolume   `json:"virtual_volumes"`
 	Ports          []PortMap         `json:"ports"`
 }
@@ -282,19 +277,8 @@ func (p *Profile) NewPodmanSpec(cwd string) (*PodmanSpec, error) {
 		},
 	}
 
-	containerBase := fmt.Sprintf("/home/dev/%s", projName)
-	for _, mount := range p.Workspace.DirectMounts {
-		hostPath := filepath.Join(cwd, mount)
-		if _, err := os.Stat(hostPath); err != nil {
-			fmt.Printf("[!] skipping direct mount '%s': path does not exist on host\n", mount)
-			continue
-		}
-		spec.DirectMounts = append(spec.DirectMounts, MountSpec{
-			HostPath:      hostPath,
-			ContainerPath: filepath.Join(containerBase, mount),
-		})
-	}
-	spec.VirtualVolumes = p.Workspace.VirtualVolumes
+	spec.ProjectMount = p.IsProjectMounted()
+	spec.VirtualVolumes = p.VirtualVolumes
 	spec.Ports = p.Ports
 
 	return spec, nil

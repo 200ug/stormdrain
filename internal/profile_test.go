@@ -87,19 +87,19 @@ func TestBuildDotfilesBlockEmpty(t *testing.T) {
 // build dirs block
 
 func TestBuildDirsBlockEmpty(t *testing.T) {
-	p := &Profile{}
+	projectMount := false
+	p := &Profile{ProjectMount: &projectMount}
 	if result := p.buildDirsBlock("myproject"); result != "" {
-		t.Errorf("expected empty string for empty workspace, got %q", result)
+		t.Errorf("expected empty string for disabled project mount and no volumes, got %q", result)
 	}
 }
 
 func TestBuildDirsBlockWithWorkspace(t *testing.T) {
+	projectMount := true
 	p := &Profile{
-		Workspace: Workspace{
-			DirectMounts: []string{"cmd", "go.mod"},
-			VirtualVolumes: []VirtualVolume{
-				{Name: "go-mod-cache", Path: "/go/pkg/mod"},
-			},
+		ProjectMount: &projectMount,
+		VirtualVolumes: []VirtualVolume{
+			{Name: "go-mod-cache", Path: "/go/pkg/mod"},
 		},
 	}
 	result := p.buildDirsBlock("myproject")
@@ -115,17 +115,17 @@ func TestBuildDirsBlockWithWorkspace(t *testing.T) {
 }
 
 func TestBuildDirsBlockVirtualOnly(t *testing.T) {
+	projectMount := false
 	p := &Profile{
-		Workspace: Workspace{
-			VirtualVolumes: []VirtualVolume{
-				{Name: "go-mod-cache", Path: "/go/pkg/mod"},
-				{Name: "go-build-cache", Path: "/home/dev/.cache/go-build"},
-			},
+		ProjectMount: &projectMount,
+		VirtualVolumes: []VirtualVolume{
+			{Name: "go-mod-cache", Path: "/go/pkg/mod"},
+			{Name: "go-build-cache", Path: "/home/dev/.cache/go-build"},
 		},
 	}
 	result := p.buildDirsBlock("myproject")
 	if strings.Contains(result, "/home/dev/myproject") {
-		t.Errorf("workdir should not appear without direct mounts, got %q", result)
+		t.Errorf("workdir should not appear without project mount, got %q", result)
 	}
 	if !strings.Contains(result, "/go/pkg/mod") || !strings.Contains(result, "/home/dev/.cache/go-build") {
 		t.Errorf("expected both virtual volume paths, got %q", result)
@@ -420,18 +420,15 @@ func TestNewPodmanSpecWithWorkspace(t *testing.T) {
 	t.Cleanup(func() { os.Chdir(origWd) })
 
 	workDir := t.TempDir()
-	os.MkdirAll(filepath.Join(workDir, "cmd"), 0755)
-	os.WriteFile(filepath.Join(workDir, "go.mod"), []byte("module test"), 0644)
 	os.Chdir(workDir)
 
+	projectMount := true
 	p := &Profile{
-		Name:  "golang",
-		Shell: "/bin/zsh",
-		Workspace: Workspace{
-			DirectMounts: []string{"cmd", "go.mod"},
-			VirtualVolumes: []VirtualVolume{
-				{Name: "go-mod-cache", Path: "/go/pkg/mod"},
-			},
+		Name:         "golang",
+		Shell:        "/bin/zsh",
+		ProjectMount: &projectMount,
+		VirtualVolumes: []VirtualVolume{
+			{Name: "go-mod-cache", Path: "/go/pkg/mod"},
 		},
 	}
 
@@ -466,11 +463,8 @@ func TestNewPodmanSpecWithWorkspace(t *testing.T) {
 	if spec.BuildArgs["UID"] == "" || spec.BuildArgs["GID"] == "" {
 		t.Error("BuildArgs UID or GID is empty")
 	}
-	if len(spec.DirectMounts) != 2 {
-		t.Fatalf("DirectMounts: got %d, want 2", len(spec.DirectMounts))
-	}
-	if spec.DirectMounts[0].HostPath != filepath.Join(workDir, "cmd") {
-		t.Errorf("DirectMounts[0].HostPath: got %q", spec.DirectMounts[0].HostPath)
+	if !spec.ProjectMount {
+		t.Error("ProjectMount: got false, want true")
 	}
 	if spec.VirtualVolumes[0].Name != "go-mod-cache" {
 		t.Errorf("VirtualVolumes[0].Name: got %q", spec.VirtualVolumes[0].Name)
@@ -494,8 +488,8 @@ func TestNewPodmanSpecNoWorkspace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(spec.DirectMounts) != 0 {
-		t.Errorf("DirectMounts: got %d, want 0", len(spec.DirectMounts))
+	if !spec.ProjectMount {
+		t.Error("ProjectMount: got false, want true (default)")
 	}
 	if len(spec.VirtualVolumes) != 0 {
 		t.Errorf("VirtualVolumes: got %d, want 0", len(spec.VirtualVolumes))
@@ -530,23 +524,25 @@ func TestNewPodmanSpecDefaultShell(t *testing.T) {
 	}
 }
 
-func TestNewPodmanSpecMountPathNotExist(t *testing.T) {
-	os.Stdout = nil
-	workDir := t.TempDir()
+func TestNewPodmanSpecProjectMountDisabled(t *testing.T) {
+	origWd, _ := os.Getwd()
+	t.Cleanup(func() { os.Chdir(origWd) })
 
+	workDir := t.TempDir()
+	os.Chdir(workDir)
+
+	projectMount := false
 	p := &Profile{
-		Name: "test",
-		Workspace: Workspace{
-			DirectMounts: []string{"nonexistent_dir"},
-		},
+		Name:         "test",
+		ProjectMount: &projectMount,
 	}
 
 	spec, err := p.NewPodmanSpec(workDir)
 	if err != nil {
-		t.Fatalf("expected nil error for nonexistent mount path, got %v", err)
+		t.Fatal(err)
 	}
-	if len(spec.DirectMounts) != 0 {
-		t.Errorf("expected DirectMounts to be empty, got %d entries", len(spec.DirectMounts))
+	if spec.ProjectMount {
+		t.Error("ProjectMount: got true, want false")
 	}
 }
 
@@ -596,14 +592,12 @@ func TestPodmanSpecRoundTrip(t *testing.T) {
 		ImageTag:      "stormdrain-golang-myproject",
 		Shell:         "/bin/zsh",
 		ProjectPath:   "/home/user/project",
+		ProjectMount:  true,
 		BuildCtx:      "/tmp/.stormdrain",
 		DotfileDir:    "/tmp/.stormdrain/dots",
 		BuildArgs: map[string]string{
 			"UID": "1000",
 			"GID": "1000",
-		},
-		DirectMounts: []MountSpec{
-			{HostPath: "/home/user/project/cmd", ContainerPath: "/home/dev/myproject/cmd"},
 		},
 		VirtualVolumes: []VirtualVolume{
 			{Name: "go-mod-cache", Path: "/go/pkg/mod"},
@@ -640,11 +634,8 @@ func TestPodmanSpecRoundTrip(t *testing.T) {
 	if loaded.BuildArgs["UID"] != original.BuildArgs["UID"] {
 		t.Errorf("BuildArgs UID: got %q, want %q", loaded.BuildArgs["UID"], original.BuildArgs["UID"])
 	}
-	if len(loaded.DirectMounts) != len(original.DirectMounts) {
-		t.Errorf("DirectMounts length: got %d, want %d", len(loaded.DirectMounts), len(original.DirectMounts))
-	}
-	if loaded.DirectMounts[0].HostPath != original.DirectMounts[0].HostPath {
-		t.Errorf("DirectMounts[0].HostPath: got %q, want %q", loaded.DirectMounts[0].HostPath, original.DirectMounts[0].HostPath)
+	if loaded.ProjectMount != original.ProjectMount {
+		t.Errorf("ProjectMount: got %v, want %v", loaded.ProjectMount, original.ProjectMount)
 	}
 	if len(loaded.VirtualVolumes) != len(original.VirtualVolumes) {
 		t.Errorf("VirtualVolumes length: got %d, want %d", len(loaded.VirtualVolumes), len(original.VirtualVolumes))
@@ -687,10 +678,7 @@ func TestLoadProfile(t *testing.T) {
 		Dotfiles: []Dotfile{
 			{SourcePattern: "~/.bashrc", DestinationPath: "~/."},
 		},
-		Workspace: Workspace{
-			DirectMounts:   []string{"src", "Makefile"},
-			VirtualVolumes: []VirtualVolume{{Name: "cache", Path: "/var/cache"}},
-		},
+		VirtualVolumes: []VirtualVolume{{Name: "cache", Path: "/var/cache"}},
 	}
 
 	data, _ := json.Marshal(profileData)
@@ -710,11 +698,8 @@ func TestLoadProfile(t *testing.T) {
 	if len(profile.Packages) != 2 {
 		t.Errorf("Packages length: got %d, want 2", len(profile.Packages))
 	}
-	if profile.Workspace.DirectMounts[0] != "src" {
-		t.Errorf("DirectMounts[0]: got %q, want %q", profile.Workspace.DirectMounts[0], "src")
-	}
-	if profile.Workspace.VirtualVolumes[0].Name != "cache" {
-		t.Errorf("VirtualVolumes[0].Name: got %q, want %q", profile.Workspace.VirtualVolumes[0].Name, "cache")
+	if profile.VirtualVolumes[0].Name != "cache" {
+		t.Errorf("VirtualVolumes[0].Name: got %q, want %q", profile.VirtualVolumes[0].Name, "cache")
 	}
 }
 

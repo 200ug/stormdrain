@@ -57,11 +57,9 @@ func podmanRun(spec *PodmanSpec) error {
 		"--label", "stormdrain",
 		"--label", fmt.Sprintf("stormdrain.project-path=%s", spec.ProjectPath),
 	}
-	if len(spec.DirectMounts) > 0 {
+	if spec.ProjectMount {
 		args = append(args, "-w", fmt.Sprintf("/home/dev/%s", spec.ContainerName))
-	}
-	for _, m := range spec.DirectMounts {
-		args = append(args, "-v", fmt.Sprintf("%s:%s", m.HostPath, m.ContainerPath))
+		args = append(args, "-v", fmt.Sprintf("%s:/home/dev/%s", spec.ProjectPath, spec.ContainerName))
 	}
 	for _, v := range spec.VirtualVolumes {
 		args = append(args, "-v", fmt.Sprintf("%s:%s:U", v.Name, v.Path))
