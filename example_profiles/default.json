@@ -1,12 +1,12 @@
 {
     "name": "default",
-    "description": "default profile (nvim v0.12.1)",
+    "description": "nvim & standard tools",
     "shell": "/bin/zsh",
     "packages": ["ripgrep", "zsh-autosuggestions", "fzf", "tmux", "tree"],
     "installers": [
         "curl -Lo /tmp/nvim-linux-x86_64.tar.gz https://github.com/neovim/neovim/releases/download/v0.12.1/nvim-linux-x86_64.tar.gz && tar -xzf /tmp/nvim-linux-x86_64.tar.gz -C /tmp && cp -r /tmp/nvim-linux-x86_64/* ~/.local/"
     ],
-    "dotfiles": [
+    "configs": [
         { "src": "~/.config/nvim", "dst": "~/.config/nvim", "exclude": ["plugin"] },
         { "src": "~/.config/tmux", "dst": "~/.config/tmux" },
         { "src": "~/.zshrc", "dst": "~/." },
