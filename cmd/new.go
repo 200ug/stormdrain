@@ -46,29 +46,29 @@ func CmdNew(args []string) {
 		fmt.Printf("[!] failed to resolve cwd: %v\n", err)
 		os.Exit(1)
 	}
-	defer internal.CleanupStagedDotfiles(cwd)
-	if err = profile.StageDotfiles(cwd); err != nil {
-		fmt.Printf("[!] failed to stage dotfiles: %v\n", err)
-		internal.CleanupStagedDotfiles(cwd)
+	defer internal.CleanupStagedConfigs(cwd)
+	if err = profile.StageConfigs(cwd); err != nil {
+		fmt.Printf("[!] failed to stage configs: %v\n", err)
+		internal.CleanupStagedConfigs(cwd)
 		os.Exit(1)
 	}
 	podSpec, err := profile.NewPodmanSpec(cwd)
 	if err != nil {
 		fmt.Printf("[!] failed to create container spec: %v\n", err)
-		internal.CleanupStagedDotfiles(cwd)
+		internal.CleanupStagedConfigs(cwd)
 		os.Exit(1)
 	}
 
 	if err = internal.PodmanCreate(podSpec); err != nil {
 		fmt.Printf("[!] failed to create new container: %v\n", err)
-		internal.CleanupStagedDotfiles(cwd)
+		internal.CleanupStagedConfigs(cwd)
 		os.Exit(1)
 	}
 
 	// persistence to $cwd/.stormdrain/
 	if err = podSpec.WriteToDisk(cwd); err != nil {
 		fmt.Printf("[!] failed to write container spec to disk: %v\n", err)
-		internal.CleanupStagedDotfiles(cwd)
+		internal.CleanupStagedConfigs(cwd)
 		os.Exit(1)
 	}
 	fmt.Printf("[+] spec written to '%s'\n", filepath.Join(cwd, ".stormdrain"))

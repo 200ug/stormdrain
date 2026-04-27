@@ -58,17 +58,17 @@ func TestBuildInstallersBlockEmpty(t *testing.T) {
 	}
 }
 
-func TestBuildDotfilesBlockWithDotfiles(t *testing.T) {
+func TestBuildConfigsBlockWithConfigs(t *testing.T) {
 	p := &Profile{
-		Dotfiles: []Dotfile{
+		Configs: []Config{
 			{SourcePattern: "~/.config/nvim", DestinationPath: "~/.config/nvim"},
 			{SourcePattern: "~/.zshrc", DestinationPath: "~/."},
 		},
 	}
-	result := p.buildDotfilesBlock()
+	result := p.buildConfigsBlock()
 	expectedLines := []string{
-		"COPY --chown=$UID:$GID dots/.config/nvim /home/dev/.config/nvim\n",
-		"COPY --chown=$UID:$GID dots/.zshrc /home/dev/.\n",
+		"COPY --chown=$UID:$GID configs/.config/nvim /home/dev/.config/nvim\n",
+		"COPY --chown=$UID:$GID configs/.zshrc /home/dev/.\n",
 	}
 	for _, line := range expectedLines {
 		if !strings.Contains(result, line) {
@@ -77,9 +77,9 @@ func TestBuildDotfilesBlockWithDotfiles(t *testing.T) {
 	}
 }
 
-func TestBuildDotfilesBlockEmpty(t *testing.T) {
+func TestBuildConfigsBlockEmpty(t *testing.T) {
 	p := &Profile{}
-	if result := p.buildDotfilesBlock(); result != "" {
+	if result := p.buildConfigsBlock(); result != "" {
 		t.Errorf("expected empty string, got %q", result)
 	}
 }
@@ -162,7 +162,7 @@ ARG GID=1000
 USER dev
 # {{PROFILE_PKGS}}
 # {{PROFILE_INSTALLERS}}
-# {{PROFILE_DOTFILES}}
+# {{PROFILE_CONFIGS}}
 # {{PROFILE_DIRS}}
 CMD ["sleep", "infinity"]
 `
@@ -176,7 +176,7 @@ CMD ["sleep", "infinity"]
 	p := &Profile{
 		Packages:   []string{"ripgrep"},
 		Installers: []string{"echo hello"},
-		Dotfiles: []Dotfile{
+		Configs: []Config{
 			{SourcePattern: "~/.zshrc", DestinationPath: "~/."},
 		},
 	}
@@ -197,8 +197,8 @@ CMD ["sleep", "infinity"]
 	if strings.Contains(resultStr, "# {{PROFILE_INSTALLERS}}") {
 		t.Error("PROFILE_INSTALLERS marker not replaced")
 	}
-	if strings.Contains(resultStr, "# {{PROFILE_DOTFILES}}") {
-		t.Error("PROFILE_DOTFILES marker not replaced")
+	if strings.Contains(resultStr, "# {{PROFILE_CONFIGS}}") {
+		t.Error("PROFILE_CONFIGS marker not replaced")
 	}
 	if strings.Contains(resultStr, "# {{PROFILE_DIRS}}") {
 		t.Error("PROFILE_DIRS marker not replaced")
@@ -209,8 +209,8 @@ CMD ["sleep", "infinity"]
 	if !strings.Contains(resultStr, "RUN echo hello\n") {
 		t.Error("installer block not present in output")
 	}
-	if !strings.Contains(resultStr, "COPY --chown=$UID:$GID dots/.zshrc /home/dev/.") {
-		t.Error("dotfiles block not present in output")
+	if !strings.Contains(resultStr, "COPY --chown=$UID:$GID configs/.zshrc /home/dev/.") {
+		t.Error("configs block not present in output")
 	}
 }
 
@@ -229,7 +229,7 @@ func TestDockerfileSubstitutionEmptyProfile(t *testing.T) {
 USER dev
 # {{PROFILE_PKGS}}
 # {{PROFILE_INSTALLERS}}
-# {{PROFILE_DOTFILES}}
+# {{PROFILE_CONFIGS}}
 # {{PROFILE_DIRS}}
 CMD ["sleep", "infinity"]
 `
@@ -256,9 +256,9 @@ CMD ["sleep", "infinity"]
 	}
 }
 
-// dotfile staging
+// config staging
 
-func TestStageDotfilesFileCopy(t *testing.T) {
+func TestStageConfigsFileCopy(t *testing.T) {
 	origUserHome := userHome
 	t.Cleanup(func() { userHome = origUserHome })
 
@@ -272,19 +272,19 @@ func TestStageDotfilesFileCopy(t *testing.T) {
 	workDir := t.TempDir()
 
 	p := &Profile{
-		Dotfiles: []Dotfile{
+		Configs: []Config{
 			{SourcePattern: "~/.zshrc", DestinationPath: "~/."},
 			{SourcePattern: "~/.config/nvim", DestinationPath: "~/.config/nvim"},
 		},
 	}
 
-	if err := p.StageDotfiles(workDir); err != nil {
+	if err := p.StageConfigs(workDir); err != nil {
 		t.Fatal(err)
 	}
 
-	dotsDir := filepath.Join(workDir, ".stormdrain", "dots")
+	configsDir := filepath.Join(workDir, ".stormdrain", "configs")
 
-	zshrcDst := filepath.Join(dotsDir, ".zshrc")
+	zshrcDst := filepath.Join(configsDir, ".zshrc")
 	data, err := os.ReadFile(zshrcDst)
 	if err != nil {
 		t.Fatalf("zshrc not found at %s: %v", zshrcDst, err)
@@ -293,7 +293,7 @@ func TestStageDotfilesFileCopy(t *testing.T) {
 		t.Errorf("zshrc content mismatch: got %q", string(data))
 	}
 
-	initLuaDst := filepath.Join(dotsDir, ".config", "nvim", "init.lua")
+	initLuaDst := filepath.Join(configsDir, ".config", "nvim", "init.lua")
 	data, err = os.ReadFile(initLuaDst)
 	if err != nil {
 		t.Fatalf("init.lua not found at %s: %v", initLuaDst, err)
@@ -303,15 +303,15 @@ func TestStageDotfilesFileCopy(t *testing.T) {
 	}
 }
 
-func TestStageDotfilesEmpty(t *testing.T) {
+func TestStageConfigsEmpty(t *testing.T) {
 	p := &Profile{}
 	workDir := t.TempDir()
-	if err := p.StageDotfiles(workDir); err != nil {
-		t.Fatalf("expected nil error for empty dotfiles, got %v", err)
+	if err := p.StageConfigs(workDir); err != nil {
+		t.Fatalf("expected nil error for empty configs, got %v", err)
 	}
 }
 
-func TestStageDotfilesGlobPattern(t *testing.T) {
+func TestStageConfigsGlobPattern(t *testing.T) {
 	origUserHome := userHome
 	t.Cleanup(func() { userHome = origUserHome })
 
@@ -326,18 +326,18 @@ func TestStageDotfilesGlobPattern(t *testing.T) {
 	workDir := t.TempDir()
 
 	p := &Profile{
-		Dotfiles: []Dotfile{
+		Configs: []Config{
 			{SourcePattern: "~/.config/zsh/*", DestinationPath: "~/."},
 		},
 	}
 
-	if err := p.StageDotfiles(workDir); err != nil {
+	if err := p.StageConfigs(workDir); err != nil {
 		t.Fatal(err)
 	}
 
-	dotsDir := filepath.Join(workDir, ".stormdrain", "dots")
-	aliases := filepath.Join(dotsDir, ".config", "zsh", "aliases.zsh")
-	env := filepath.Join(dotsDir, ".config", "zsh", "env.zsh")
+	configsDir := filepath.Join(workDir, ".stormdrain", "configs")
+	aliases := filepath.Join(configsDir, ".config", "zsh", "aliases.zsh")
+	env := filepath.Join(configsDir, ".config", "zsh", "env.zsh")
 
 	if _, err := os.Stat(aliases); err != nil {
 		t.Errorf("aliases.zsh not staged: %v", err)
@@ -347,7 +347,7 @@ func TestStageDotfilesGlobPattern(t *testing.T) {
 	}
 }
 
-func TestStageDotfilesWithExclude(t *testing.T) {
+func TestStageConfigsWithExclude(t *testing.T) {
 	origUserHome := userHome
 	t.Cleanup(func() { userHome = origUserHome })
 
@@ -366,18 +366,18 @@ func TestStageDotfilesWithExclude(t *testing.T) {
 	workDir := t.TempDir()
 
 	p := &Profile{
-		Dotfiles: []Dotfile{
+		Configs: []Config{
 			{SourcePattern: "~/.config/nvim", DestinationPath: "~/.config/nvim", Exclude: []string{"plugin"}},
 		},
 	}
 
-	if err := p.StageDotfiles(workDir); err != nil {
+	if err := p.StageConfigs(workDir); err != nil {
 		t.Fatal(err)
 	}
 
-	dotsDir := filepath.Join(workDir, ".stormdrain", "dots")
+	configsDir := filepath.Join(workDir, ".stormdrain", "configs")
 
-	initData, err := os.ReadFile(filepath.Join(dotsDir, ".config", "nvim", "init.lua"))
+	initData, err := os.ReadFile(filepath.Join(configsDir, ".config", "nvim", "init.lua"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -385,7 +385,7 @@ func TestStageDotfilesWithExclude(t *testing.T) {
 		t.Errorf("init.lua: got %q, want %q", string(initData), "init")
 	}
 
-	pluginsData, err := os.ReadFile(filepath.Join(dotsDir, ".config", "nvim", "lua", "plugins.lua"))
+	pluginsData, err := os.ReadFile(filepath.Join(configsDir, ".config", "nvim", "lua", "plugins.lua"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -393,23 +393,23 @@ func TestStageDotfilesWithExclude(t *testing.T) {
 		t.Errorf("plugins.lua: got %q, want %q", string(pluginsData), "plugins")
 	}
 
-	if _, err := os.Stat(filepath.Join(dotsDir, ".config", "nvim", "plugin")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(configsDir, ".config", "nvim", "plugin")); !os.IsNotExist(err) {
 		t.Error("plugin directory should be excluded")
 	}
 }
 
-func TestCleanupStagedDotfiles(t *testing.T) {
+func TestCleanupStagedConfigs(t *testing.T) {
 	workDir := t.TempDir()
-	dotsDir := filepath.Join(workDir, ".stormdrain", "dots")
-	os.MkdirAll(dotsDir, 0755)
-	os.WriteFile(filepath.Join(dotsDir, "test"), []byte("data"), 0644)
+	configsDir := filepath.Join(workDir, ".stormdrain", "configs")
+	os.MkdirAll(configsDir, 0755)
+	os.WriteFile(filepath.Join(configsDir, "test"), []byte("data"), 0644)
 
-	if err := CleanupStagedDotfiles(workDir); err != nil {
+	if err := CleanupStagedConfigs(workDir); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := os.Stat(dotsDir); !os.IsNotExist(err) {
-		t.Error("dots directory should be removed after cleanup")
+	if _, err := os.Stat(configsDir); !os.IsNotExist(err) {
+		t.Error("configs directory should be removed after cleanup")
 	}
 }
 
@@ -497,8 +497,8 @@ func TestNewPodmanSpecNoWorkspace(t *testing.T) {
 	if spec.BuildCtx != filepath.Join(workDir, ".stormdrain") {
 		t.Errorf("BuildCtx: got %q, want %q", spec.BuildCtx, filepath.Join(workDir, ".stormdrain"))
 	}
-	if spec.DotfileDir != filepath.Join(workDir, ".stormdrain", "dots") {
-		t.Errorf("DotfileDir: got %q, want %q", spec.DotfileDir, filepath.Join(workDir, ".stormdrain", "dots"))
+	if spec.ConfigsDir != filepath.Join(workDir, ".stormdrain", "configs") {
+		t.Errorf("ConfigsDir: got %q, want %q", spec.ConfigsDir, filepath.Join(workDir, ".stormdrain", "configs"))
 	}
 }
 
@@ -594,7 +594,7 @@ func TestPodmanSpecRoundTrip(t *testing.T) {
 		ProjectPath:   "/home/user/project",
 		ProjectMount:  true,
 		BuildCtx:      "/tmp/.stormdrain",
-		DotfileDir:    "/tmp/.stormdrain/dots",
+		ConfigsDir:    "/tmp/.stormdrain/configs",
 		BuildArgs: map[string]string{
 			"UID": "1000",
 			"GID": "1000",
@@ -646,8 +646,8 @@ func TestPodmanSpecRoundTrip(t *testing.T) {
 	if loaded.BuildCtx != "" {
 		t.Errorf("BuildCtx should be excluded from serialization, got %q", loaded.BuildCtx)
 	}
-	if loaded.DotfileDir != "" {
-		t.Errorf("DotfileDir should be excluded from serialization, got %q", loaded.DotfileDir)
+	if loaded.ConfigsDir != "" {
+		t.Errorf("ConfigsDir should be excluded from serialization, got %q", loaded.ConfigsDir)
 	}
 	if len(loaded.Ports) != len(original.Ports) {
 		t.Errorf("Ports length: got %d, want %d", len(loaded.Ports), len(original.Ports))
@@ -675,7 +675,7 @@ func TestLoadProfile(t *testing.T) {
 		Shell:       "/bin/bash",
 		Packages:    []string{"vim", "git"},
 		Installers:  []string{"curl -sL https://example.com | bash"},
-		Dotfiles: []Dotfile{
+		Configs: []Config{
 			{SourcePattern: "~/.bashrc", DestinationPath: "~/."},
 		},
 		VirtualVolumes: []VirtualVolume{{Name: "cache", Path: "/var/cache"}},

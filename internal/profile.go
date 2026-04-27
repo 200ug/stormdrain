@@ -23,7 +23,7 @@ func init() {
 	globalConfigDir = filepath.Join(userHome, ".config", "stormdrain")
 }
 
-type Dotfile struct {
+type Config struct {
 	SourcePattern   string   `json:"src"`
 	DestinationPath string   `json:"dst"`
 	Exclude         []string `json:"exclude"`
@@ -45,7 +45,7 @@ type Profile struct {
 	Shell        string    `json:"shell"`
 	Packages     []string  `json:"packages"`
 	Installers   []string  `json:"installers"`
-	Dotfiles     []Dotfile `json:"dotfiles"`      // copied during container image building (i.e. globbing supported)
+	Configs     []Config `json:"configs"`      // copied during container image building (-> globbing supported)
 	ProjectMount *bool     `json:"project_mount"` // mount project directory into container (default true)
 	Ports        []PortMap `json:"ports"`         // host <-> container port mappings
 	VirtualVolumes []VirtualVolume `json:"virtual_volumes"`
@@ -99,7 +99,7 @@ func (p *Profile) DockerfileSubstitution() error {
 
 	res := strings.Replace(string(og), "# {{PROFILE_PKGS}}\n", p.buildPackagesBlock(), 1)
 	res = strings.Replace(res, "# {{PROFILE_INSTALLERS}}\n", p.buildInstallersBlock(), 1)
-	res = strings.Replace(res, "# {{PROFILE_DOTFILES}}\n", p.buildDotfilesBlock(), 1)
+	res = strings.Replace(res, "# {{PROFILE_CONFIGS}}\n", p.buildConfigsBlock(), 1)
 	res = strings.Replace(res, "# {{PROFILE_DIRS}}\n", p.buildDirsBlock(projName), 1)
 
 	sdDir := filepath.Join(cwd, ".stormdrain")
@@ -166,43 +166,43 @@ func (p *Profile) buildDirsBlock(projName string) string {
 	return b.String()
 }
 
-func (p *Profile) buildDotfilesBlock() string {
+func (p *Profile) buildConfigsBlock() string {
 	b := strings.Builder{}
-	for _, df := range p.Dotfiles {
-		// build ctx is $cwd/.stormdrain, dotfiles are temporarily copied to dots/ to allow access
-		// NOTE: this assumes all dotfile paths contain '~' (!!!)
-		src := strings.Replace(df.SourcePattern, "~", "dots", 1)
+	for _, df := range p.Configs {
+		// build ctx is $cwd/.stormdrain, configs are temporarily copied to configs/ to allow access
+		// NOTE: this assumes all config paths contain '~' (!!!)
+		src := strings.Replace(df.SourcePattern, "~", "configs", 1)
 		dst := strings.Replace(df.DestinationPath, "~", "/home/dev", 1)
 		fmt.Fprintf(&b, "COPY --chown=$UID:$GID %s %s\n", src, dst)
 	}
 	return b.String()
 }
 
-// Copies dotfile sources (specified in profile config) to $cwd/.stormdrain/dots
+// Copies config sources (specified in profile config) to $cwd/.stormdrain/configs
 // so they're accessible from Dockerfile's build context. '~' and env variables
 // are expanded as per usual.
 //
-// E.g. '~/.config/nvim' becomes '$cwd/.stormdrain/dots/.config/nvim'
-func (p *Profile) StageDotfiles(cwd string) error {
-	if len(p.Dotfiles) == 0 {
+// E.g. '~/.config/nvim' becomes '$cwd/.stormdrain/configs/.config/nvim'
+func (p *Profile) StageConfigs(cwd string) error {
+	if len(p.Configs) == 0 {
 		return nil
 	}
 
-	dotsDir := filepath.Join(cwd, ".stormdrain", "dots")
-	if err := os.MkdirAll(dotsDir, 0755); err != nil {
+	configsDir := filepath.Join(cwd, ".stormdrain", "configs")
+	if err := os.MkdirAll(configsDir, 0755); err != nil {
 		return err
 	}
 
-	for _, df := range p.Dotfiles {
+	for _, df := range p.Configs {
 		src := df.SourcePattern
 		src = strings.Replace(src, "~", userHome, 1)
 		src = os.ExpandEnv(src) // expand $HOME, $XDG_CONFIG_HOME etc. just in case
 
 		matches, err := filepath.Glob(src)
 		if err != nil {
-			return fmt.Errorf("dotfile glob failed for '%s': %w", df.SourcePattern, err)
+			return fmt.Errorf("config glob failed for '%s': %w", df.SourcePattern, err)
 		} else if len(matches) == 0 {
-			return fmt.Errorf("dotfile glob pattern '%s' matched no files", df.SourcePattern)
+			return fmt.Errorf("config glob pattern '%s' matched no files", df.SourcePattern)
 		}
 
 		for _, m := range matches {
@@ -215,7 +215,7 @@ func (p *Profile) StageDotfiles(cwd string) error {
 			if err != nil {
 				return err
 			}
-			dstPath := filepath.Join(dotsDir, relToHome)
+			dstPath := filepath.Join(configsDir, relToHome)
 
 			if info.IsDir() {
 				if err := CopyDir(m, dstPath, df.Exclude); err != nil {
@@ -235,8 +235,8 @@ func (p *Profile) StageDotfiles(cwd string) error {
 	return nil
 }
 
-func CleanupStagedDotfiles(cwd string) error {
-	return os.RemoveAll(filepath.Join(cwd, ".stormdrain", "dots"))
+func CleanupStagedConfigs(cwd string) error {
+	return os.RemoveAll(filepath.Join(cwd, ".stormdrain", "configs"))
 }
 
 // Build configuration for a new container image. Only used during build stage ('new' cmd).
@@ -248,7 +248,7 @@ type PodmanSpec struct {
 	ProjectPath    string            `json:"project_path"`
 	ProjectMount   bool              `json:"project_mount"`
 	BuildCtx       string            `json:"-"`
-	DotfileDir     string            `json:"-"`
+	ConfigsDir string            `json:"-"`
 	BuildArgs      map[string]string `json:"build_args"`
 	VirtualVolumes []VirtualVolume   `json:"virtual_volumes"`
 	Ports          []PortMap         `json:"ports"`
@@ -270,7 +270,7 @@ func (p *Profile) NewPodmanSpec(cwd string) (*PodmanSpec, error) {
 		Shell:         shell,
 		ProjectPath:   cwd,
 		BuildCtx:      filepath.Join(cwd, ".stormdrain"),
-		DotfileDir:    filepath.Join(cwd, ".stormdrain", "dots"),
+		ConfigsDir:    filepath.Join(cwd, ".stormdrain", "configs"),
 		BuildArgs: map[string]string{
 			"UID": strconv.Itoa(uid),
 			"GID": strconv.Itoa(gid),
