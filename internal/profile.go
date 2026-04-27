@@ -40,14 +40,14 @@ type PortMap struct {
 }
 
 type Profile struct {
-	Name         string    `json:"name"` // ideally matches the profile's filename for clarity
-	Description  string    `json:"description"`
-	Shell        string    `json:"shell"`
-	Packages     []string  `json:"packages"`
-	Installers   []string  `json:"installers"`
-	Configs     []Config `json:"configs"`      // copied during container image building (-> globbing supported)
-	ProjectMount *bool     `json:"project_mount"` // mount project directory into container (default true)
-	Ports        []PortMap `json:"ports"`         // host <-> container port mappings
+	Name           string          `json:"name"` // ideally matches the profile's filename for clarity
+	Description    string          `json:"description"`
+	Shell          string          `json:"shell"`
+	Packages       []string        `json:"packages"`
+	Installers     []string        `json:"installers"`
+	Configs        []Config        `json:"configs"`       // copied during container image building (-> globbing supported)
+	ProjectMount   *bool           `json:"project_mount"` // mount project directory into container (default true)
+	Ports          []PortMap       `json:"ports"`         // host <-> container port mappings
 	VirtualVolumes []VirtualVolume `json:"virtual_volumes"`
 }
 
@@ -248,7 +248,7 @@ type PodmanSpec struct {
 	ProjectPath    string            `json:"project_path"`
 	ProjectMount   bool              `json:"project_mount"`
 	BuildCtx       string            `json:"-"`
-	ConfigsDir string            `json:"-"`
+	ConfigsDir     string            `json:"-"`
 	BuildArgs      map[string]string `json:"build_args"`
 	VirtualVolumes []VirtualVolume   `json:"virtual_volumes"`
 	Ports          []PortMap         `json:"ports"`
