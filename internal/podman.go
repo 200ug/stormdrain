@@ -112,6 +112,10 @@ func podmanRun(spec *PodmanSpec) error {
 	for _, pm := range spec.Ports {
 		args = append(args, "-p", fmt.Sprintf("%d:%d", pm.Host, pm.Container))
 	}
+	for _, ef := range spec.EnvFiles {
+		// if ef doesn't exist on host, this will error (captured through the cmd.Run() call)
+		args = append(args, "--env-file", ef)
+	}
 	args = append(args, spec.ImageTag)
 
 	cmd := exec.Command("podman", args...)

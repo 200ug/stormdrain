@@ -4,8 +4,6 @@ import (
 	"testing"
 )
 
-// container exists
-
 func TestContainerExistsReturnsFalseWithoutPodman(t *testing.T) {
 	exists := ContainerExists("stormdrain-nonexistent-container-xyz")
 	if exists {

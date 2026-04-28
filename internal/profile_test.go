@@ -580,6 +580,96 @@ func TestNewPodmanSpecWithPorts(t *testing.T) {
 	}
 }
 
+func TestNewPodmanSpecWithEnvFiles(t *testing.T) {
+	origUserHome := userHome
+	origWd, _ := os.Getwd()
+	t.Cleanup(func() {
+		userHome = origUserHome
+		os.Chdir(origWd)
+	})
+
+	homeDir := t.TempDir()
+	userHome = homeDir
+	workDir := t.TempDir()
+	os.Chdir(workDir)
+
+	opencodeDir := filepath.Join(homeDir, ".config", "opencode")
+	os.MkdirAll(opencodeDir, 0755)
+	os.WriteFile(filepath.Join(opencodeDir, ".env"), []byte("API_KEY=abc123"), 0644)
+
+	absDir := filepath.Join(workDir, "secrets")
+	os.MkdirAll(absDir, 0755)
+	os.WriteFile(filepath.Join(absDir, "secrets.env"), []byte("TOKEN=xyz"), 0644)
+
+	p := &Profile{
+		Name:     "secrets",
+		Shell:    "/bin/zsh",
+		EnvFiles: []string{"~/.config/opencode/.env", filepath.Join(absDir, "secrets.env")},
+	}
+
+	spec, err := p.NewPodmanSpec(workDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(spec.EnvFiles) != 2 {
+		t.Fatalf("EnvFiles: got %d, want 2", len(spec.EnvFiles))
+	}
+	if spec.EnvFiles[0] != filepath.Join(homeDir, ".config/opencode/.env") {
+		t.Errorf("EnvFiles[0]: got %q, want %q", spec.EnvFiles[0], filepath.Join(homeDir, ".config/opencode/.env"))
+	}
+	if spec.EnvFiles[1] != filepath.Join(absDir, "secrets.env") {
+		t.Errorf("EnvFiles[1]: got %q, want %q", spec.EnvFiles[1], filepath.Join(absDir, "secrets.env"))
+	}
+}
+
+func TestNewPodmanSpecRejectsMissingEnvFile(t *testing.T) {
+	origUserHome := userHome
+	origWd, _ := os.Getwd()
+	t.Cleanup(func() {
+		userHome = origUserHome
+		os.Chdir(origWd)
+	})
+
+	homeDir := t.TempDir()
+	userHome = homeDir
+	workDir := t.TempDir()
+	os.Chdir(workDir)
+
+	p := &Profile{
+		Name:     "secrets",
+		Shell:    "/bin/zsh",
+		EnvFiles: []string{"~/.nonexistent/secrets.env"},
+	}
+
+	_, err := p.NewPodmanSpec(workDir)
+	if err == nil {
+		t.Fatal("expected error for missing env file, got nil")
+	}
+	if !strings.Contains(err.Error(), "env file not found") {
+		t.Errorf("expected 'env file not found' error, got %q", err.Error())
+	}
+}
+
+func TestNewPodmanSpecNoEnvFiles(t *testing.T) {
+	origWd, _ := os.Getwd()
+	t.Cleanup(func() { os.Chdir(origWd) })
+
+	workDir := t.TempDir()
+	os.Chdir(workDir)
+
+	p := &Profile{Name: "basic", Shell: "/bin/zsh"}
+
+	spec, err := p.NewPodmanSpec(workDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(spec.EnvFiles) != 0 {
+		t.Errorf("EnvFiles: got %d, want 0", len(spec.EnvFiles))
+	}
+}
+
 // spec round-trip
 
 func TestPodmanSpecRoundTrip(t *testing.T) {
@@ -604,6 +694,10 @@ func TestPodmanSpecRoundTrip(t *testing.T) {
 		},
 		Ports: []PortMap{
 			{Host: 8080, Container: 3000},
+		},
+		EnvFiles: []string{
+			"/home/user/.config/opencode/.env",
+			"/home/user/.stormdrain/secrets.env",
 		},
 	}
 
@@ -655,6 +749,14 @@ func TestPodmanSpecRoundTrip(t *testing.T) {
 	if loaded.Ports[0].Host != original.Ports[0].Host || loaded.Ports[0].Container != original.Ports[0].Container {
 		t.Errorf("Ports[0]: got host=%d container=%d, want host=%d container=%d",
 			loaded.Ports[0].Host, loaded.Ports[0].Container, original.Ports[0].Host, original.Ports[0].Container)
+	}
+	if len(loaded.EnvFiles) != len(original.EnvFiles) {
+		t.Errorf("EnvFiles length: got %d, want %d", len(loaded.EnvFiles), len(original.EnvFiles))
+	}
+	for i, ef := range loaded.EnvFiles {
+		if ef != original.EnvFiles[i] {
+			t.Errorf("EnvFiles[%d]: got %q, want %q", i, ef, original.EnvFiles[i])
+		}
 	}
 }
 

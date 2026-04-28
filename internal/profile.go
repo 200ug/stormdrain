@@ -45,10 +45,11 @@ type Profile struct {
 	Shell          string          `json:"shell"`
 	Packages       []string        `json:"packages"`
 	Installers     []string        `json:"installers"`
-	Configs        []Config        `json:"configs"`       // copied during container image building (-> globbing supported)
-	ProjectMount   *bool           `json:"project_mount"` // mount project directory into container (default true)
-	Ports          []PortMap       `json:"ports"`         // host <-> container port mappings
+	Configs        []Config        `json:"configs"`       // globbing supported
+	ProjectMount   *bool           `json:"project_mount"` // defaults to true
+	Ports          []PortMap       `json:"ports"`
 	VirtualVolumes []VirtualVolume `json:"virtual_volumes"`
+	EnvFiles       []string        `json:"env_files"` // injected at runtime
 }
 
 func (p *Profile) IsProjectMounted() bool {
@@ -239,7 +240,9 @@ func CleanupStagedConfigs(cwd string) error {
 	return os.RemoveAll(filepath.Join(cwd, ".stormdrain", "configs"))
 }
 
-// Build configuration for a new container image. Only used during build stage ('new' cmd).
+// Build configuration for a new container image. Initially used to initialize new
+// containers ("new" cmd), then persisted to the project's .stormdrain directory,
+// and later used to instruct follow-up commands if necessary.
 type PodmanSpec struct {
 	ContainerName  string            `json:"container_name"`
 	Hostname       string            `json:"hostname"`
@@ -252,6 +255,7 @@ type PodmanSpec struct {
 	BuildArgs      map[string]string `json:"build_args"`
 	VirtualVolumes []VirtualVolume   `json:"virtual_volumes"`
 	Ports          []PortMap         `json:"ports"`
+	EnvFiles       []string          `json:"env_files"`
 }
 
 func (p *Profile) NewPodmanSpec(cwd string) (*PodmanSpec, error) {
@@ -280,6 +284,15 @@ func (p *Profile) NewPodmanSpec(cwd string) (*PodmanSpec, error) {
 	spec.ProjectMount = p.IsProjectMounted()
 	spec.VirtualVolumes = p.VirtualVolumes
 	spec.Ports = p.Ports
+
+	for _, ef := range p.EnvFiles {
+		expanded := strings.Replace(ef, "~", userHome, 1)
+		expanded = os.ExpandEnv(expanded)
+		if _, err := os.Stat(expanded); err != nil {
+			return nil, fmt.Errorf("env file not found: %s", expanded)
+		}
+		spec.EnvFiles = append(spec.EnvFiles, expanded)
+	}
 
 	return spec, nil
 }
