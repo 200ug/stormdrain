@@ -14,7 +14,7 @@ This layout can be initialized with `scripts/init.sh`, which populates the afore
 After creating a new profile inside a project directory by running `stormdrain new <profile>` (or `stormdrain new -f <profile_path>`), a `.stormdrain/` directory is created. This is the place where the tool persists the configurations and other metadata specific to that particular project. It's advisable to simply gitignore this. The directory's contents include the following:
 
 - `Dockerfile.sd` is the substituted Dockerfile generated from `Dockerfile.base` and the active profile.
-- `pod_spec.json` persists the container configuration (name, project path, image tag, volume mounts, and such) for commands like `enter`, `close`, and `rm` to reference.
+- `pod_spec.json` persists the container configuration (name, project path, image tag, volume mounts, env files, and such) for commands like `enter`, `close`, and `rm` to reference.
 - `configs/` is a temporary staging directory for config files copied during the build process. It is cleaned up automatically after container creation.
 
 ## profiles
@@ -30,6 +30,7 @@ Profiles are the primary way of configuring and templating container environment
 | `project_mount` | Whether to bind-mount the project directory into the container at /home/dev/<project> and set it as the working dir, set to `false` to disable | `true` |
 | `ports` | Host-to-container port forwarding. Each entry is `{ "host": <port>, "container": <port> }` | `[]` |
 | `virtual_volumes` | Named podman volumes for persistent container-local storage (e.g. caches), each entry is `{ "name": <name>, "path": <path_on_container> }`, volumes are owned by the container user | `[]` |
+| `env_files` | Host `.env` files whose key-value pairs are injected as environment variables into the container at runtime | `[]` |
 
 ## usage
 
