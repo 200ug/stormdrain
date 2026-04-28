@@ -17,7 +17,7 @@ commands:
   enter [name]               attach a shell to a container matching cwd or given container name
   close [name] [-f]          close the container matching cwd or given container name (optionally SIGKILL)
   rm [name]                  remove the container matching cwd or given container name
-  ls [-f <filter>] [-s]      list all stormdrain containers (optional filtering and stats)
+  ls [-f <filter>]           list all stormdrain containers (optional filtering)
   purge                      shut down and delete *all* stormdrain containers
   help                       print this usage message
   version                    print current build version

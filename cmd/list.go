@@ -11,13 +11,12 @@ import (
 func CmdList(args []string) {
 	fs := flag.NewFlagSet("list", flag.ExitOnError)
 	filter := fs.String("f", "", "filter containers by name")
-	stats := fs.Bool("s", false, "show container statistics")
 	fs.Usage = func() {
-		fmt.Println("[?] usage: stormdrain list [-f <filter>] [-s]")
+		fmt.Println("[?] usage: stormdrain list [-f <filter>]")
 	}
 	fs.Parse(args)
 
-	if err := internal.PodmanList(*filter, *stats); err != nil {
+	if err := internal.PodmanList(*filter); err != nil {
 		fmt.Printf("[!] failed to list containers: %v\n", err)
 		os.Exit(1)
 	}

@@ -149,8 +149,7 @@ func PodmanAttach(containerName, shell string) error {
 	return err
 }
 
-func PodmanList(filter string, stats bool) error {
-	// TODO: implement -s stats output (image size, uptime, resource usage, etc.)
+func PodmanList(filter string) error {
 	args := []string{"ps", "-a", "--filter", "label=stormdrain"}
 	if filter != "" {
 		args = append(args, "--filter", filter)
