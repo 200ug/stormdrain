@@ -29,7 +29,7 @@ func deleteContainer(containerName string) {
 
 	fmt.Printf("[~] killing and removing container '%s'... ", containerName)
 	// we can omit this error as we'll just fall back to shutting the container down in PodmanRemove
-	_ = internal.PodmanStop(containerName, true)
+	_ = internal.PodmanStop(containerName, true, true)
 	if err := internal.PodmanRemove(containerName); err != nil {
 		fmt.Println("failed")
 		fmt.Printf("[!] failed to remove container '%s': %v\n", containerName, err)

@@ -162,14 +162,18 @@ func PodmanList(filter string, stats bool) error {
 	return cmd.Run()
 }
 
-func PodmanStop(containerName string, kill bool) error {
+func PodmanStop(containerName string, kill bool, ignoreErr bool) error {
 	action := "stop"
 	if kill {
 		action = "kill"
 	}
 	cmd := exec.Command("podman", action, containerName)
 	cmd.Stdout = nil
-	cmd.Stderr = os.Stderr
+	if ignoreErr {
+		cmd.Stderr = nil
+	} else {
+		cmd.Stderr = os.Stderr
+	}
 
 	return cmd.Run()
 }

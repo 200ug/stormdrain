@@ -37,7 +37,7 @@ func CmdClose(args []string) {
 	}
 
 	fmt.Printf("[~] stopping container '%s'... ", containerName)
-	if err := internal.PodmanStop(containerName, *force); err != nil {
+	if err := internal.PodmanStop(containerName, *force, false); err != nil {
 		fmt.Println("failed")
 		fmt.Printf("[!] failed to close container '%s': %v\n", containerName, err)
 		os.Exit(1)
