@@ -1,6 +1,6 @@
 {
     "name": "golang",
-    "description": "runtime, lsp, tooling, & project mount",
+    "description": "runtime, lsp, & project mount",
     "shell": "/bin/zsh",
     "packages": [
         "ripgrep", "zsh-autosuggestions", "fzf", "tmux", "tree",
@@ -10,6 +10,9 @@
         "curl -L -o /tmp/go-linux-amd64.tar.gz https://go.dev/dl/go1.26.2.linux-amd64.tar.gz && sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf /tmp/go-linux-amd64.tar.gz"
     ],
     "project_mount": true,
+    "configs": [
+        { "src": "~/.zshrc", "dst": "~/." }
+    ],
     "virtual_volumes": [
         { "path": "/go/pkg/mod", "name": "go-mod-cache" },
         { "path": "/home/dev/.cache/go-build", "name": "go-build-cache" }

@@ -1,0 +1,18 @@
+{
+    "name": "opencode",
+    "description": "opencode & standard tools",
+    "shell": "/bin/zsh",
+    "packages": ["ripgrep", "zsh-autosuggestions", "fzf", "tmux", "tree"],
+    "installers": [
+        "curl -fsSL https://opencode.ai/install | bash"
+    ],
+    "project_mount": false,
+    "configs": [
+        { "src": "~/.config/nvim", "dst": "~/.config/nvim", "exclude": ["plugin"] },
+        { "src": "~/.config/tmux", "dst": "~/.config/tmux" },
+        { "src": "~/.zshrc", "dst": "~/." },
+        { "src": "~/.config/zsh", "dst": "~/.config/zsh" },
+        { "src": "~/.config/opencode/opencode.json", "dst": "~/.config/opencode/opencode.json" },
+        { "src": "~/.local/share/opencode/auth.json", "dst": "~/.local/share/opencode/auth.json" }
+    ]
+}

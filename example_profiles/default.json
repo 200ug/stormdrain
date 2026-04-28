@@ -10,7 +10,6 @@
     "configs": [
         { "src": "~/.config/nvim", "dst": "~/.config/nvim", "exclude": ["plugin"] },
         { "src": "~/.config/tmux", "dst": "~/.config/tmux" },
-        { "src": "~/.zshrc", "dst": "~/." },
-        { "src": "~/.config/zsh", "dst": "~/.config/zsh" }
+        { "src": "~/.zshrc", "dst": "~/." }
     ]
 }
