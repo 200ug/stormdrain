@@ -6,6 +6,7 @@
     "installers": [
         "curl -Lo /tmp/nvim-linux-x86_64.tar.gz https://github.com/neovim/neovim/releases/download/v0.12.1/nvim-linux-x86_64.tar.gz && tar -xzf /tmp/nvim-linux-x86_64.tar.gz -C /tmp && cp -r /tmp/nvim-linux-x86_64/* ~/.local/"
     ],
+    "project_mount": false,
     "configs": [
         { "src": "~/.config/nvim", "dst": "~/.config/nvim", "exclude": ["plugin"] },
         { "src": "~/.config/tmux", "dst": "~/.config/tmux" },
