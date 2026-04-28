@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -8,7 +9,51 @@ import (
 	"strings"
 )
 
-// TODO: function that ensures podman is in PATH and the machine is running (startup if not)
+func EnsurePodmanRunning() error {
+	if _, err := exec.LookPath("podman"); err != nil {
+		return fmt.Errorf("podman not found in PATH: %w", err)
+	}
+
+	out, err := exec.Command("podman", "machine", "list", "--format", "json").Output()
+	if err != nil {
+		return fmt.Errorf("failed to list podman machines: %w", err)
+	}
+
+	var machines []struct {
+		Name    string `json:"Name"`
+		Running bool   `json:"Running"`
+		Default bool   `json:"Default"`
+	}
+	if err := json.Unmarshal(out, &machines); err != nil {
+		return fmt.Errorf("failed to parse podman machine list: %w", err)
+	}
+
+	if len(machines) == 0 {
+		return fmt.Errorf("no podman machine initialized; run 'podman machine init' first")
+	}
+
+	machine := machines[0]
+	for _, m := range machines {
+		if m.Default {
+			machine = m
+			break
+		}
+	}
+
+	if machine.Running {
+		return nil
+	}
+
+	fmt.Printf("[~] no running podman machine detected, starting '%s'\n", machine.Name)
+	cmd := exec.Command("podman", "machine", "start", machine.Name)
+	cmd.Stdout = nil
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to start podman machine %q: %w", machine.Name, err)
+	}
+
+	return nil
+}
 
 func PodmanCreate(spec *PodmanSpec) error {
 	fmt.Println("[~] building container image")

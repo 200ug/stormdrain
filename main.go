@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"codeberg.org/2ug/stormdrain/cmd"
+	"codeberg.org/2ug/stormdrain/internal"
 )
 
 const versionCode = "v0.1 (2026-04-22)"
@@ -25,6 +26,11 @@ commands:
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Print(usage)
+		os.Exit(1)
+	}
+
+	if err := internal.EnsurePodmanRunning(); err != nil {
+		fmt.Printf("[!] tool prep failed: %v\n", err)
 		os.Exit(1)
 	}
 
