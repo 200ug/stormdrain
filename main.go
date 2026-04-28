@@ -8,7 +8,7 @@ import (
 	"codeberg.org/2ug/stormdrain/internal"
 )
 
-const versionCode = "v0.1 (2026-04-22)"
+const versionCode = "v1.0 (2026-04-28)"
 
 const usage = `[?] usage: stormdrain <command> [flags]
 
