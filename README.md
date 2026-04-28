@@ -1,6 +1,6 @@
 # stormdrain
 
-Declarative JSON profiles for sandboxed development environments with Podman.
+Very opinionated take on declarative JSON profiles for sandboxed development environments.
 
 ## structure
 
@@ -29,24 +29,12 @@ Profiles are the primary way of configuring and templating container environment
 | `configs` | Host files/dirs to copy into the image at build time, each entry is `{ "src": <path>, "dst": <path>, "exclude": <pattern> }` | `[]` |
 | `project_mount` | Whether to bind-mount the project directory into the container at /home/dev/<project> and set it as the working dir, set to `false` to disable | `true` |
 | `ports` | Host-to-container port forwarding. Each entry is `{ "host": <port>, "container": <port> }` | `[]` |
-| `virtual_volumes` | Named podman volumes for persistent container-local storage (e.g. caches), each entry is `{ "name": <name>, "path": <path_on_container> }`, volumes are owned by the container user | `[]` |
+| `virtual_volumes` | Named podman volumes for persistent container-local storage (e.g. caches), each entry is `{ "name": <name>, "path": <path_on_container> }`, volumes are owned by the container user and (if named the same) shared across containers | `[]` |
 | `env_files` | Host `.env` files whose key-value pairs are injected as environment variables into the container at runtime | `[]` |
 
 ## usage
 
-```
-[?] usage: stormdrain <command> [flags]
-
-commands:
-  new [-f <path>] <profile>  create a new container from a profile (or profile file path)
-  enter [name]               attach a shell to a container matching cwd or given container name
-  close [name] [-f]          close the container matching cwd or given container name (optionally SIGKILL)
-  rm [name]                  remove the container matching cwd or given container name
-  ls [-f <filter>]           list all stormdrain containers (optional filtering)
-  purge                      shut down and delete *all* stormdrain containers
-  help                       print this usage message
-  version                    print current build version
-```
+Simply put: `new` creates a container, `enter` attaches a shell, and `close` stops it. Permanent removal is done with `rm` (container, image, and .stormdrain/ directory), or `purge` to apply this to all stormdrain containers and additionally clean up named volumes. More comprehensive commands list can be obtained via `help`.
 
 ---
 
