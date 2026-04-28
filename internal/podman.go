@@ -219,6 +219,22 @@ func ContainerProjectPath(name string) (string, error) {
 	return path, nil
 }
 
+func PodmanImageRemove(imageTag string) error {
+	cmd := exec.Command("podman", "rmi", imageTag)
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+
+	return cmd.Run()
+}
+
+func PodmanVolumeRemove(name string) error {
+	cmd := exec.Command("podman", "volume", "rm", name)
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+
+	return cmd.Run()
+}
+
 func podmanStart(name string) error {
 	cmd := exec.Command("podman", "start", name)
 	cmd.Stdout = os.Stdout
