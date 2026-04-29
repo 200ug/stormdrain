@@ -34,7 +34,7 @@ Profiles are the primary way of configuring and templating container environment
 
 ## usage
 
-Simply put: `new` creates a container, `enter` attaches a shell, and `close` stops it. Permanent removal is done with `rm` (container, image, and .stormdrain/ directory), or `purge` to apply this to all stormdrain containers and additionally clean up named volumes. More comprehensive commands list can be obtained via `help`.
+Simply put: `new` creates a container, `enter` attaches a shell, and `close` stops it. Permanent removal is done with `rm` (container, image, and `.stormdrain/` directory), or `purge` to apply this to all stormdrain containers and additionally clean up named volumes. More comprehensive commands list can be obtained via `help`.
 
 ---
 
