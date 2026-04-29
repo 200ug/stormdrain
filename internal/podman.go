@@ -6,7 +6,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 )
 
 func EnsurePodmanRunning() error {
@@ -44,7 +46,6 @@ func EnsurePodmanRunning() error {
 		return nil
 	}
 
-	fmt.Printf("[~] no running podman machine detected, starting '%s'\n", machine.Name)
 	cmd := exec.Command("podman", "machine", "start", machine.Name)
 	cmd.Stdout = nil
 	cmd.Stderr = os.Stderr
@@ -136,7 +137,8 @@ func PodmanAttach(containerName, shell string) error {
 		return fmt.Errorf("container '%q' does not exist", containerName)
 	}
 
-	cmd := exec.Command("podman", "exec", "-it", containerName, shell)
+	// NOTE: hardcoded detach keys for now, probably should be configurable
+	cmd := exec.Command("podman", "exec", "-it", "--detach-keys", "ctrl-x,ctrl-q", containerName, shell)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -149,16 +151,226 @@ func PodmanAttach(containerName, shell string) error {
 	return err
 }
 
-func PodmanList(filter string) error {
-	args := []string{"ps", "-a", "--filter", "label=stormdrain"}
-	if filter != "" {
-		args = append(args, "--filter", filter)
-	}
-	cmd := exec.Command("podman", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+type GeneralStats struct {
+	// static
+	MachineName            string
+	AvailableTotalCPUs     int
+	AvailableTotalMemoryGB int
+	AvailableDiskSizeGB    int
 
-	return cmd.Run()
+	// dynamic, refreshed via Update()
+	TotalContainers int
+	TotalRunning    int
+	Containers      []ContainerStats
+}
+
+func NewGeneralStats() (*GeneralStats, error) {
+	machineStats, err := queryActiveMachineStats()
+	if err != nil {
+		return nil, err
+	}
+
+	containers, err := ListContainers("")
+	if err != nil {
+		return nil, err
+	}
+	runningCount := 0
+	for _, c := range containers {
+		if c.Uptime != -1 {
+			runningCount++
+		}
+	}
+	memory, err := strconv.Atoi(machineStats.Memory)
+	if err != nil {
+		memory = -1
+	} else {
+		memory = memory / 1_000_000_000
+	}
+	diskSize, err := strconv.Atoi(machineStats.DiskSize)
+	if err != nil {
+		diskSize = -1
+	} else {
+		diskSize = diskSize / 1_000_000_000
+	}
+	gs := &GeneralStats{
+		MachineName:            machineStats.Name,
+		AvailableTotalCPUs:     machineStats.CPUs,
+		AvailableTotalMemoryGB: memory,
+		AvailableDiskSizeGB:    diskSize,
+		TotalContainers:        len(containers),
+		TotalRunning:           runningCount,
+		Containers:             containers,
+	}
+
+	return gs, nil
+}
+
+func (gs *GeneralStats) Update(filter string) error {
+	all, err := ListContainers("")
+	if err != nil {
+		return err
+	}
+	gs.TotalContainers = len(all)
+	gs.TotalRunning = 0
+	for _, c := range all {
+		if c.Uptime != -1 {
+			gs.TotalRunning++
+		}
+	}
+
+	if filter == "" {
+		gs.Containers = all
+	} else {
+		filtered := make([]ContainerStats, 0, len(all))
+		lower := strings.ToLower(filter)
+		for _, c := range all {
+			if strings.Contains(strings.ToLower(c.Name), lower) {
+				filtered = append(filtered, c)
+			}
+		}
+		gs.Containers = filtered
+	}
+
+	return nil
+}
+
+type ContainerStats struct {
+	// list view
+	Name   string
+	Uptime int    // -1 if down (overall status derived from this)
+	CPU    string // "<dir_perc>% / <avg_perc>%"
+	Memory string // "<perc>%"
+	NetIO  string // "<total_sent> / <total_received>"
+
+	// expanded/inspection view
+	ImageTag    string
+	ProjectPath string // from label
+	Mounts      []string
+	Ports       []portStat
+}
+
+type machineStats struct {
+	Name     string `json:"Name"`
+	Running  bool   `json:"Running"`
+	Default  bool   `json:"Default"`
+	CPUs     int    `json:"CPUs"`
+	Memory   string `json:"Memory"`
+	DiskSize string    `json:"DiskSize"`
+}
+
+func queryActiveMachineStats() (*machineStats, error) {
+	raw, err := exec.Command("podman", "machine", "list", "--format", "json").Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list podman machines: %w", err)
+	}
+
+	var machines []machineStats
+	if err := json.Unmarshal(raw, &machines); err != nil {
+		return nil, fmt.Errorf("failed to parse machine list: %w", err)
+	}
+
+	for _, m := range machines {
+		if m.Running && m.Default {
+			return &m, nil
+		}
+	}
+	for _, m := range machines {
+		if m.Running {
+			return &m, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no running podman machine found")
+}
+
+type rawPSOutput struct {
+	ID        string `json:"Id"` // first 12 bytes used to match stats output
+	State     string `json:"State"`
+	StartedAt int    `json:"StartedAt"`
+	CreatedAt int    `json:"Created"`
+	ImageTag  string `json:"Image"`
+	Labels    struct {
+		ProjectPath string `json:"stormdrain.project-path"`
+	} `json:"Labels"`
+	Mounts []string   `json:"Mounts"`
+	Ports  []portStat `json:"Ports"`
+}
+
+type rawStatOutput struct {
+	ID                   string `json:"id"`
+	Name                 string `json:"name"`
+	CPUDirectPercentage  string `json:"cpu_percent"`
+	CPUAveragePercentage string `json:"avg_cpu"`
+	MemoryPercentage     string `json:"mem_percent"`
+	NetworkIO            string `json:"net_io"`
+}
+
+type portStat struct {
+	ContainerPort int    `json:"container_port"`
+	HostPort      int    `json:"host_port"`
+	Protocol      string `json:"protocol"`
+}
+
+func ListContainers(filter string) ([]ContainerStats, error) {
+	psArgs := []string{"ps", "-a", "--format", "json", "--filter", "label=stormdrain"}
+	if filter != "" {
+		psArgs = append(psArgs, "--filter", "name="+filter)
+	}
+	psOut, err := exec.Command("podman", psArgs...).Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list containers: %w", err)
+	}
+	var psRaw []rawPSOutput
+	if err := json.Unmarshal(psOut, &psRaw); err != nil {
+		return nil, fmt.Errorf("failed to parse list output: %w", err)
+	}
+
+	statsArgs := []string{"stats", "-a", "--format", "json", "--no-stream"}
+	statsOut, err := exec.Command("podman", statsArgs...).Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get podman stats: %w", err)
+	}
+	var statsRaw []rawStatOutput
+	if err := json.Unmarshal(statsOut, &statsRaw); err != nil {
+		return nil, fmt.Errorf("failed to parse podman stats: %w", err)
+	}
+	// build lookup map from unfiltered stats output
+	statsByID := make(map[string]*rawStatOutput, len(statsRaw))
+	for i := range statsRaw {
+		statsByID[statsRaw[i].ID] = &statsRaw[i]
+	}
+
+	containers := make([]ContainerStats, 0, len(psRaw))
+	for _, psr := range psRaw {
+		cs := ContainerStats{
+			ImageTag:    psr.ImageTag,
+			ProjectPath: psr.Labels.ProjectPath,
+			Mounts:      psr.Mounts,
+			Ports:       psr.Ports,
+		}
+		if psr.State != "running" {
+			cs.Uptime = -1
+		} else {
+			cs.Uptime = computeUptime(psr.StartedAt)
+		}
+		shortID := psr.ID[:12]
+		if stat, ok := statsByID[shortID]; ok {
+			cs.Name = stat.Name
+			cs.CPU = fmt.Sprintf("%s / %s", stat.CPUDirectPercentage, stat.CPUAveragePercentage)
+			cs.Memory = stat.MemoryPercentage
+			cs.NetIO = stat.NetworkIO
+		}
+		containers = append(containers, cs)
+	}
+
+	return containers, nil
+}
+
+func computeUptime(startedAt int) int {
+	if startedAt == 0 {
+		return -1
+	}
+	return int(time.Now().Unix()) - startedAt
 }
 
 func PodmanStop(containerName string, kill bool, ignoreErr bool) error {
