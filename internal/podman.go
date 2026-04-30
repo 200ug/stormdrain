@@ -170,7 +170,7 @@ func NewGeneralStats() (*GeneralStats, error) {
 		return nil, err
 	}
 
-	containers, err := ListContainers("")
+	containers, err := ListContainers()
 	if err != nil {
 		return nil, err
 	}
@@ -205,8 +205,8 @@ func NewGeneralStats() (*GeneralStats, error) {
 	return gs, nil
 }
 
-func (gs *GeneralStats) Update(filter string) error {
-	all, err := ListContainers("")
+func (gs *GeneralStats) Update() error {
+	all, err := ListContainers()
 	if err != nil {
 		return err
 	}
@@ -217,19 +217,7 @@ func (gs *GeneralStats) Update(filter string) error {
 			gs.TotalRunning++
 		}
 	}
-
-	if filter == "" {
-		gs.Containers = all
-	} else {
-		filtered := make([]ContainerStats, 0, len(all))
-		lower := strings.ToLower(filter)
-		for _, c := range all {
-			if strings.Contains(strings.ToLower(c.Name), lower) {
-				filtered = append(filtered, c)
-			}
-		}
-		gs.Containers = filtered
-	}
+	gs.Containers = all
 
 	return nil
 }
@@ -311,11 +299,8 @@ type portStat struct {
 	Protocol      string `json:"protocol"`
 }
 
-func ListContainers(filter string) ([]ContainerStats, error) {
+func ListContainers() ([]ContainerStats, error) {
 	psArgs := []string{"ps", "-a", "--format", "json", "--filter", "label=stormdrain"}
-	if filter != "" {
-		psArgs = append(psArgs, "--filter", "name="+filter)
-	}
 	psOut, err := exec.Command("podman", psArgs...).Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list containers: %w", err)
@@ -334,7 +319,8 @@ func ListContainers(filter string) ([]ContainerStats, error) {
 	if err := json.Unmarshal(statsOut, &statsRaw); err != nil {
 		return nil, fmt.Errorf("failed to parse podman stats: %w", err)
 	}
-	// build lookup map from unfiltered stats output
+	// build lookup map from stats output (should be 1-to-1 with ps output now 
+	// that there's no *additional* filtering on either of them)
 	statsByID := make(map[string]*rawStatOutput, len(statsRaw))
 	for i := range statsRaw {
 		statsByID[statsRaw[i].ID] = &statsRaw[i]

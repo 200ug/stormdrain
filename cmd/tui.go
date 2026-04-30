@@ -16,7 +16,6 @@ import (
 
 var (
 	gs            *internal.GeneralStats
-	currentFilter string
 	version       string
 )
 
@@ -89,7 +88,7 @@ func RunTUI(v string) {
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
 		for range ticker.C {
-			if err := gs.Update(currentFilter); err != nil {
+			if err := gs.Update(); err != nil {
 				app.QueueUpdateDraw(func() {
 					errorView.SetText(fmt.Sprintf("[red]%s[-]", err.Error()))
 				})
@@ -114,7 +113,6 @@ func RunTUI(v string) {
 		}
 	}()
 
-	// navigation, filtering, and actions
 	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		row, _ := table.GetSelection()
 
