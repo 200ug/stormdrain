@@ -1,8 +1,9 @@
-package internal
+package util
 
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -185,13 +186,7 @@ func TestCopyDirExcludeGlob(t *testing.T) {
 
 func TestRandomHostname(t *testing.T) {
 	host := RandomHostname()
-	found := false
-	for _, h := range Hostnames {
-		if h == host {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(Hostnames, host)
 	if !found {
 		t.Errorf("RandomHostname() returned %q, which is not in Hostnames list", host)
 	}
