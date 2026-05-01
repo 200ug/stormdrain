@@ -1,5 +1,2 @@
-# general
 .stormdrain/
-
-# bin
-*.bin
+bin
