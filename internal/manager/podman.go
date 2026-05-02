@@ -3,6 +3,7 @@ package manager
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,7 +14,7 @@ import (
 )
 
 const (
-	defaultShell = "/bin/zsh"
+	DefaultShell = "/bin/zsh"
 	detachKeys   = "ctrl-x,ctrl-q"
 )
 
@@ -92,6 +93,8 @@ func ensurePodmanMachineIsRunning() (*machineStats, error) {
 		return &machine, nil
 	}
 
+	// NOTE: logging is ok here, as this runs before TUI initialization
+	log.Printf("No running machine found, starting %q...", machine.Name)
 	cmd := exec.Command("podman", "machine", "start", machine.Name)
 	cmd.Stdout = nil
 	cmd.Stderr = os.Stderr
@@ -195,7 +198,7 @@ func NewSpec(profile *Profile, projectPath string) (*Spec, error) {
 	containerName, hostname := uniqueContainerName(projectName)
 	shell := profile.Shell
 	if shell == "" {
-		shell = defaultShell
+		shell = DefaultShell
 	}
 
 	spec := &Spec{
