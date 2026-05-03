@@ -25,15 +25,16 @@ const (
 const (
 	notifTTL = 15 * time.Second
 
-	// TODO: adjust these to make sure they all fit together nicely
 	defaultTextColor       = tcell.ColorWhite
 	inactiveColor          = tcell.ColorGray
-	headingColor           = tcell.ColorBeige
+	headingColor           = tcell.ColorBlanchedAlmond
+	modalBgColor           = tcell.ColorDarkCyan
+	modalBorderColor       = tcell.ColorBlack
 	titleColor             = tcell.ColorBlanchedAlmond
-	toolNameColor          = tcell.ColorYellowGreen
-	selectionColor         = tcell.Color111
-	notificationColor      = tcell.ColorGreenYellow
-	errorNotificationColor = tcell.ColorRed
+	toolNameColor          = tcell.ColorOrange
+	selectionColor         = tcell.ColorLightBlue
+	notificationColor      = tcell.ColorLightGreen
+	errorNotificationColor = tcell.ColorIndianRed
 )
 
 type TUI struct {
@@ -432,6 +433,11 @@ func (t *TUI) newCreateView() (*tview.Flex, *tview.Form) {
 		SetTitle(" Create Container ").
 		SetTitleAlign(tview.AlignLeft).
 		SetTitleColor(titleColor)
+	form.SetFieldBackgroundColor(modalBgColor)
+	form.SetFieldTextColor(tcell.ColorWhite)
+	form.SetLabelColor(titleColor)
+	form.SetButtonBackgroundColor(tcell.ColorDarkCyan)
+	form.SetButtonTextColor(tcell.ColorWhite)
 	form.AddDropDown("Profile", profileNames, 0, func(option string, idx int) {
 		if idx < len(t.Profiles) {
 			selectedProfile = t.Profiles[idx]
@@ -553,7 +559,9 @@ func (t *TUI) newRemoveConfirmModal(containerName string, container *manager.Con
 	modal := tview.NewModal().
 		SetText(fmt.Sprintf("Remove container %s?\nThis will also delete its image and .stormdrain/ directory.", containerName)).
 		AddButtons([]string{"Remove", "Cancel"}).
-		SetTextColor(defaultTextColor)
+		SetTextColor(defaultTextColor).
+		SetBackgroundColor(modalBgColor)
+	modal.SetBorderColor(modalBorderColor)
 	modal.SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 		if buttonIndex == 0 { // "Remove"
 			spec, err := manager.LoadSpec(container.ProjectPath)

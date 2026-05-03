@@ -15,19 +15,19 @@ type Container struct {
 	Memory    string // "<perc>%"
 	NetIO     string // "<total_sent> / <total_received>"
 
-	ImageTag           string
-	ProjectPath        string // from label
-	Mounts             []string
-	Ports              []portPs
+	ImageTag    string
+	ProjectPath string // from label
+	Mounts      []string
+	Ports       []portPs
 }
 
 func NewContainer(ps containerPs, stats *containerStats) Container {
 	c := Container{
-		Name:               "-",
-		ImageTag:           ps.ImageTag,
-		ProjectPath:        ps.Labels.ProjectPath,
-		Mounts:             ps.Mounts,
-		Ports:              ps.Ports,
+		Name:        "-",
+		ImageTag:    ps.ImageTag,
+		ProjectPath: ps.Labels.ProjectPath,
+		Mounts:      ps.Mounts,
+		Ports:       ps.Ports,
 	}
 	if ps.State != "running" {
 		c.UptimeSec = -1
