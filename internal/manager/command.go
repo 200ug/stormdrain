@@ -52,6 +52,9 @@ func (c *Command) NotificationPrint() string {
 		//		 it'd be printed after we've exited from the container
 		return "Restored previous state successfully"
 	case Stop:
+		if c.Force {
+			return "Container killed successfully"
+		}
 		return "Container stopped successfully"
 	case Remove:
 		return "Container removed successfully"
