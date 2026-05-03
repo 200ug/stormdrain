@@ -2,7 +2,10 @@ package tui
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"codeberg.org/2ug/stormdrain/internal/manager"
@@ -21,26 +24,36 @@ const (
 
 const (
 	// TODO: adjust these to make sure they all fit together nicely
-	defaultTextColor = tcell.ColorWhite
-	inactiveColor    = tcell.ColorGray
-	headingColor     = tcell.ColorBeige
-	titleColor       = tcell.ColorBlanchedAlmond
-	toolNameColor    = tcell.ColorYellowGreen
-	selectionColor   = tcell.Color111
+	defaultTextColor       = tcell.ColorWhite
+	inactiveColor          = tcell.ColorGray
+	headingColor           = tcell.ColorBeige
+	titleColor             = tcell.ColorBlanchedAlmond
+	toolNameColor          = tcell.ColorYellowGreen
+	selectionColor         = tcell.Color111
+	notificationColor      = tcell.ColorGreenYellow
+	errorNotificationColor = tcell.ColorRed
 )
 
 type TUI struct {
 	VersionCode      string
 	ActiveRow        int
+	UserHome         string
 	DataManager      *manager.Manager
+	Profiles         []*manager.Profile
 	App              *tview.Application
+	Pages            *tview.Pages
 	HeaderView       *tview.TextView
 	NotificationView *tview.TextView
 	ContainerTable   *tview.Table
 	DetailView       *tview.TextView
 }
 
-func NewTUI(manager *manager.Manager, versionCode string) *TUI {
+func NewTUI(m *manager.Manager, versionCode string) *TUI {
+	userHome, err := os.UserHomeDir()
+	if err != nil {
+		return nil // ?
+	}
+
 	var tui *TUI
 	app := tview.NewApplication()
 
@@ -79,7 +92,10 @@ func NewTUI(manager *manager.Manager, versionCode string) *TUI {
 		AddItem(notificationView, 1, 0, false).
 		AddItem(containerTable, 0, 1, true).
 		AddItem(detailView, 8, 0, false)
-	app.SetRoot(flex, true).EnableMouse(false)
+
+	pages := tview.NewPages().AddPage("main", flex, true, true)
+
+	app.SetRoot(pages, true).EnableMouse(false)
 
 	containerTable.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Rune() {
@@ -95,8 +111,15 @@ func NewTUI(manager *manager.Manager, versionCode string) *TUI {
 			app.Stop()
 			return nil
 		case 'N':
-			// TODO: modal (or similar) for new container
-			//		 the command needs to be sent to m.CmdChan
+			createView, form := tui.newCreateView()
+			if createView == nil {
+				notificationView.SetText("Error: could not initialize container creation view").
+					SetTextColor(errorNotificationColor)
+				return nil
+			}
+			tui.Pages.AddPage("create", createView, true, false)
+			tui.Pages.SwitchToPage("create")
+			tui.App.SetFocus(form)
 			return nil
 		default:
 			return event
@@ -106,8 +129,11 @@ func NewTUI(manager *manager.Manager, versionCode string) *TUI {
 	tui = &TUI{
 		VersionCode:      versionCode,
 		ActiveRow:        0, // header row, i.e. no selection
-		DataManager:      manager,
+		UserHome:         userHome,
+		DataManager:      m,
+		Profiles:         make([]*manager.Profile, 0),
 		App:              app,
+		Pages:            pages,
 		HeaderView:       headerView,
 		NotificationView: notificationView,
 		ContainerTable:   containerTable,
@@ -142,6 +168,7 @@ func (t *TUI) Update(stopChan chan any) {
 		case <-datetimeTicker.C:
 			t.App.QueueUpdateDraw(func() {
 				t.updateHeader()
+				t.handleNotifications()
 			})
 		case <-dataTicker.C:
 			t.App.QueueUpdateDraw(func() {
@@ -164,6 +191,16 @@ func (t *TUI) updateHeader() {
 		len(t.DataManager.Containers), // dynamic
 	))
 	t.DataManager.Mu.RUnlock()
+}
+
+func (t *TUI) handleNotifications() {
+	select {
+	case msg := <-t.DataManager.NotifChan:
+		t.NotificationView.SetText(fmt.Sprintf("%s", msg)).SetTextColor(notificationColor)
+	case err := <-t.DataManager.ErrChan:
+		t.NotificationView.SetText(fmt.Sprintf("Error: %s", err)).SetTextColor(errorNotificationColor)
+	default:
+	}
 }
 
 func (t *TUI) updateDetails() {
@@ -287,4 +324,156 @@ func (t *TUI) navigateTable(direction NaviDirection) {
 			nextRow++
 		}
 	}
+}
+
+func (t *TUI) newCreateView() (*tview.Flex, *tview.Form) {
+	t.collectProfiles()
+	if len(t.Profiles) == 0 {
+		return nil, nil
+	}
+	profileNames := make([]string, len(t.Profiles))
+	for i, p := range t.Profiles {
+		profileNames[i] = p.Name
+	}
+
+	// defaults that also track the state depending on the selected profile
+	defaultProjectPath, err := os.Getwd()
+	if err != nil {
+		return nil, nil
+	}
+	defaultShell := manager.DefaultShell
+	defaultProjectMount := false
+
+	var selectedProfile *manager.Profile
+	if len(t.Profiles) > 0 {
+		selectedProfile = t.Profiles[0]
+		if selectedProfile.Shell != "" {
+			defaultShell = selectedProfile.Shell
+		}
+		if selectedProfile.ProjectMount != nil {
+			defaultProjectMount = *selectedProfile.ProjectMount
+		}
+	}
+
+	form := tview.NewForm()
+	form.SetBorder(true).
+		SetTitle(" Create Container ").
+		SetTitleAlign(tview.AlignLeft).
+		SetTitleColor(titleColor)
+	form.AddDropDown("Profile", profileNames, 0, func(option string, idx int) {
+		if idx < len(t.Profiles) {
+			selectedProfile = t.Profiles[idx]
+		}
+	})
+	form.AddInputField("Project path", defaultProjectPath, 50, nil, nil)
+	form.AddCheckbox("Project mount", defaultProjectMount, nil)
+	form.AddInputField("Shell", defaultShell, 20, nil, nil)
+
+	errView := tview.NewTextView().
+		SetDynamicColors(true).
+		SetChangedFunc(func() { t.App.Draw() })
+	errView.SetTextColor(errorNotificationColor)
+
+	returnToMain := func() {
+		errView.SetText("")
+		t.Pages.SwitchToPage("main")
+		t.App.SetFocus(t.ContainerTable)
+	}
+
+	form.AddButton("Create", func() {
+		errView.SetText("")
+
+		if selectedProfile == nil {
+			errView.SetText("no profile selected").SetTextColor(errorNotificationColor)
+			return
+		}
+
+		// 1. resolve project path
+		projectPath := form.GetFormItem(1).(*tview.InputField).GetText()
+		if projectPath == "" {
+			projectPath = "."
+		}
+		absProjectPath, err := filepath.Abs(projectPath)
+		if err != nil {
+			errView.SetText(fmt.Sprintf("invalid project path: %s", err)).SetTextColor(errorNotificationColor)
+			return
+		}
+
+		// 2. substitute profile values to dockerfile template
+		configsDir := filepath.Join(t.UserHome, ".config", "stormdrain")
+		if err := selectedProfile.SubstituteDockerfileTemplate(configsDir, absProjectPath); err != nil {
+			errView.SetText(fmt.Sprintf("Dockerfile substitution failed: %s", err)).SetTextColor(errorNotificationColor)
+			return
+		}
+
+		// 3. stage configs temporarily to .stormdrain/configs
+		if err := selectedProfile.StageConfigs(t.UserHome, absProjectPath); err != nil {
+			errView.SetText(fmt.Sprintf("Config staging failed: %s", err)).SetTextColor(errorNotificationColor)
+			return
+		}
+
+		// 4. create spec profile and apply potential overrides
+		spec, err := manager.NewSpec(selectedProfile, absProjectPath)
+		if err != nil {
+			errView.SetText(fmt.Sprintf("Could not create spec: %s", err)).SetTextColor(errorNotificationColor)
+			return
+		}
+		spec.ProjectMount = form.GetFormItem(2).(*tview.Checkbox).IsChecked()
+		if shell := form.GetFormItem(3).(*tview.InputField).GetText(); shell != "" {
+			spec.Shell = shell
+		}
+
+		// 5. send create command to backend manager (handles CreateContainer + WriteToDisk + CleanupStagedConfigs)
+		t.DataManager.CmdChan <- manager.Command{Type: manager.Create, Spec: *spec}
+
+		t.Pages.SwitchToPage("main")
+		t.App.SetFocus(t.ContainerTable)
+	})
+
+	form.AddButton("Cancel", returnToMain)
+
+	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEscape {
+			returnToMain()
+			return nil
+		}
+		return event
+	})
+
+	flex := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(form, 0, 1, true).
+		AddItem(errView, 1, 0, false)
+
+	return flex, form
+}
+
+func (t *TUI) collectProfiles() {
+	configsDir := filepath.Join(t.UserHome, ".config", "stormdrain")
+	profilesDir := filepath.Join(configsDir, "profiles")
+	entries, err := os.ReadDir(profilesDir)
+	if err != nil {
+		return
+	}
+	// filter out unrelated results, and skip i/o caused by reading the full file
+	// if no apparent changes have been made
+	// TODO: this comment can act as a placeholder for a more sophisticated implementation (if one's ever needed)
+	var profileEntries []os.DirEntry
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".json") {
+			profileEntries = append(profileEntries, entry)
+		}
+	}
+	if len(profileEntries) == len(t.Profiles) {
+		return
+	}
+
+	var profiles []*manager.Profile
+	for _, profileEntry := range profileEntries {
+		profile, err := manager.LoadProfile(configsDir, strings.TrimSuffix(profileEntry.Name(), ".json"))
+		if err != nil {
+			continue // this could just be random json file in the wrong place, no need to fail
+		}
+		profiles = append(profiles, profile)
+	}
+	t.Profiles = profiles
 }

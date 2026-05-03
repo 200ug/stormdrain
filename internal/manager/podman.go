@@ -254,8 +254,8 @@ func (s *Spec) CreateContainer() error {
 	}
 	buildArgs = append(buildArgs, s.BuildCtx)
 	buildCmd := exec.Command("podman", buildArgs...)
-	buildCmd.Stdout = os.Stdout
-	buildCmd.Stderr = os.Stderr
+	buildCmd.Stdout = nil
+	buildCmd.Stderr = nil
 	err := buildCmd.Run()
 	if err != nil {
 		return err
@@ -286,8 +286,8 @@ func (s *Spec) CreateContainer() error {
 	}
 	runArgs = append(runArgs, s.ImageTag)
 	runCmd := exec.Command("podman", runArgs...)
-	runCmd.Stdout = os.Stdout
-	runCmd.Stderr = os.Stderr
+	runCmd.Stdout = nil
+	runCmd.Stderr = nil
 	if err := runCmd.Run(); err != nil {
 		return err
 	}

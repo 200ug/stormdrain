@@ -25,9 +25,8 @@ func (c *Command) Execute() error {
 	switch c.Type {
 	case Create:
 		// NOTE: at this point we should've already loaded the profile config,
-		//		 handled substitution into Dockerfile, and staged the user configs;
-		//		 after exiting this command handler, we still need to handle
-		//		 cleanup of the user configs from .stormdrain/
+		//		 handled substitution into Dockerfile, and staged the user configs
+		defer CleanupStagedConfigs(c.Spec.ProjectPath)
 		return c.Spec.CreateContainer() // builds, starts, and persists
 	case Attach:
 		// TODO: this needs to be handled with app.Suspend() on tui side
