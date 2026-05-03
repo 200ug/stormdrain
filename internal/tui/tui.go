@@ -23,6 +23,8 @@ const (
 )
 
 const (
+	notifTTL = 15 * time.Second
+
 	// TODO: adjust these to make sure they all fit together nicely
 	defaultTextColor       = tcell.ColorWhite
 	inactiveColor          = tcell.ColorGray
@@ -46,6 +48,7 @@ type TUI struct {
 	NotificationView *tview.TextView
 	ContainerTable   *tview.Table
 	DetailView       *tview.TextView
+	notifSetAt       time.Time
 }
 
 func NewTUI(m *manager.Manager, versionCode string) *TUI {
@@ -259,10 +262,16 @@ func (t *TUI) updateHeader() {
 }
 
 func (t *TUI) handleNotifications() {
+	if !t.notifSetAt.IsZero() && time.Since(t.notifSetAt) > notifTTL {
+		t.NotificationView.SetText("")
+		t.notifSetAt = time.Time{}
+	}
 	select {
 	case msg := <-t.DataManager.NotifChan:
+		t.notifSetAt = time.Now()
 		t.NotificationView.SetText(fmt.Sprintf("%s", msg)).SetTextColor(notificationColor)
 	case err := <-t.DataManager.ErrChan:
+		t.notifSetAt = time.Now()
 		t.NotificationView.SetText(fmt.Sprintf("Error: %s", err)).SetTextColor(errorNotificationColor)
 	default:
 	}
@@ -517,9 +526,8 @@ func (t *TUI) collectProfiles() {
 	if err != nil {
 		return
 	}
-	// filter out unrelated results, and skip i/o caused by reading the full file
+	// NOTE: filter out unrelated results, and skip i/o caused by reading the full file
 	// if no apparent changes have been made
-	// TODO: this comment can act as a placeholder for a more sophisticated implementation (if one's ever needed)
 	var profileEntries []os.DirEntry
 	for _, entry := range entries {
 		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".json") {
