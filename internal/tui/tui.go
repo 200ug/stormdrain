@@ -156,7 +156,8 @@ func NewTUI(m *manager.Manager, versionCode string) *TUI {
 		case 'd':
 			container := tui.getSelectedContainer()
 			if container == nil {
-				tui.NotificationView.SetText("Error: no container selected").SetTextColor(errorNotificationColor)
+				tui.NotificationView.SetText("Error: no container selected").
+					SetTextColor(errorNotificationColor)
 				return nil
 			}
 			modal := tui.newRemoveConfirmModal(container.Name, container)
@@ -167,17 +168,23 @@ func NewTUI(m *manager.Manager, versionCode string) *TUI {
 			// NOTE: bypasses CmdChan entirely because AttachIntoContainer needs direct terminal access
 			container := tui.getSelectedContainer()
 			if container == nil {
-				tui.NotificationView.SetText("Error: no container selected").SetTextColor(errorNotificationColor)
+				tui.NotificationView.SetText("Error: no container selected").
+					SetTextColor(errorNotificationColor)
 				return nil
 			}
 			spec, err := manager.LoadSpec(container.ProjectPath)
 			if err != nil {
-				tui.NotificationView.SetText(fmt.Sprintf("Error: could not load spec: %s", err)).SetTextColor(errorNotificationColor)
+				tui.NotificationView.SetText(fmt.Sprintf("Error: could not load spec: %s", err)).
+					SetTextColor(errorNotificationColor)
 				return nil
 			}
-			tui.App.Suspend(func() {
+			tui.App.Suspend(func() { // blocks here until we detach from the container session
 				spec.AttachIntoContainer()
 			})
+			tui.NotificationView.SetText("Restored previous state successfully").
+				SetTextColor(notificationColor)
+			tui.updateContainerTable()
+			tui.updateDetails()
 			return nil
 		default:
 			return event

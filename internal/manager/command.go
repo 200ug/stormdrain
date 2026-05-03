@@ -48,8 +48,8 @@ func (c *Command) NotificationPrint() string {
 	case Create:
 		return "Container created successfully"
 	case Attach:
-		// TODO: see if this message needs adjusting, considering
-		//		 it'd be printed after we've exited from the container
+		// NOTE: this case should never happend, as attaching is handled 
+		//		 completely TUI-side (due to app.Suspend)
 		return "Restored previous state successfully"
 	case Stop:
 		if c.Force {
