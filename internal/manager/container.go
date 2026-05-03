@@ -17,23 +17,15 @@ type Container struct {
 
 	ImageTag           string
 	ProjectPath        string // from label
-	ProjectRootMounted bool   // true if project path in mounts
 	Mounts             []string
 	Ports              []portPs
 }
 
 func NewContainer(ps containerPs, stats *containerStats) Container {
-	prMounted := false
-	for _, mount := range ps.Mounts {
-		if mount == ps.Labels.ProjectPath {
-			prMounted = true
-		}
-	}
 	c := Container{
 		Name:               "-",
 		ImageTag:           ps.ImageTag,
 		ProjectPath:        ps.Labels.ProjectPath,
-		ProjectRootMounted: prMounted,
 		Mounts:             ps.Mounts,
 		Ports:              ps.Ports,
 	}
@@ -54,8 +46,7 @@ func NewContainer(ps containerPs, stats *containerStats) Container {
 func (c *Container) FormatDetails() string {
 	b := strings.Builder{}
 	fmt.Fprintf(&b, "Image: %s\n", c.ImageTag)
-	// TODO: fix the mounted boolean (mounts never contain the project path from host filesystem!)
-	fmt.Fprintf(&b, "Project: %s (mounted: %t)\n", c.ProjectPath, c.ProjectRootMounted)
+	fmt.Fprintf(&b, "Project: %s\n", c.ProjectPath)
 	if len(c.Ports) > 0 {
 		var ports []string
 		for _, p := range c.Ports {

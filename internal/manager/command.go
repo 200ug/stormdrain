@@ -29,8 +29,6 @@ func (c *Command) Execute() error {
 		defer CleanupStagedConfigs(c.Spec.ProjectPath)
 		return c.Spec.CreateContainer() // builds, starts, and persists
 	case Attach:
-		// TODO: this needs to be handled with app.Suspend() on tui side
-		// NOTE: this can be removed from here if it doesn't work smoothly
 		return c.Spec.AttachIntoContainer()
 	case Stop:
 		return stopContainer(c.Spec.ContainerName, c.Force)
@@ -48,7 +46,7 @@ func (c *Command) NotificationPrint() string {
 	case Create:
 		return "Container created successfully"
 	case Attach:
-		// NOTE: this case should never happend, as attaching is handled 
+		// NOTE: this case should never happend, as attaching is handled
 		//		 completely TUI-side (due to app.Suspend)
 		return "Restored previous state successfully"
 	case Stop:
