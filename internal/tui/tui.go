@@ -51,7 +51,7 @@ type TUI struct {
 func NewTUI(m *manager.Manager, versionCode string) *TUI {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
-		return nil // ?
+		return nil // needs to be checkd in caller to avoid panics
 	}
 
 	var tui *TUI
@@ -68,6 +68,7 @@ func NewTUI(m *manager.Manager, versionCode string) *TUI {
 	notificationView := tview.NewTextView().
 		SetDynamicColors(true).
 		SetChangedFunc(func() { app.Draw() })
+	notificationView.SetBorderPadding(0, 0, 1, 0)
 
 	containerTable := tview.NewTable().
 		SetBorders(false).
@@ -110,16 +111,73 @@ func NewTUI(m *manager.Manager, versionCode string) *TUI {
 		case 'q':
 			app.Stop()
 			return nil
-		case 'N':
+		case 'n':
 			createView, form := tui.newCreateView()
 			if createView == nil {
-				notificationView.SetText("Error: could not initialize container creation view").
+				tui.NotificationView.SetText("Error: could not initialize container creation view").
 					SetTextColor(errorNotificationColor)
 				return nil
 			}
 			tui.Pages.AddPage("create", createView, true, false)
 			tui.Pages.SwitchToPage("create")
 			tui.App.SetFocus(form)
+			return nil
+		case 's':
+			container := tui.getSelectedContainer()
+			if container == nil {
+				tui.NotificationView.SetText("Error: no container selected").
+					SetTextColor(errorNotificationColor)
+				return nil
+			}
+			spec, err := manager.LoadSpec(container.ProjectPath)
+			if err != nil {
+				tui.NotificationView.SetText(fmt.Sprintf("Error: could not load spec: %s", err)).
+					SetTextColor(errorNotificationColor)
+				return nil
+			}
+			tui.DataManager.CmdChan <- manager.Command{Type: manager.Stop, Spec: *spec, Force: false}
+			return nil
+		case 'x':
+			// identical to stopping, but with Force = true (i.e. kill)
+			container := tui.getSelectedContainer()
+			if container == nil {
+				tui.NotificationView.SetText("Error: no container selected").
+					SetTextColor(errorNotificationColor)
+				return nil
+			}
+			spec, err := manager.LoadSpec(container.ProjectPath)
+			if err != nil {
+				tui.NotificationView.SetText(fmt.Sprintf("Error: could not load spec: %s", err)).
+					SetTextColor(errorNotificationColor)
+				return nil
+			}
+			tui.DataManager.CmdChan <- manager.Command{Type: manager.Stop, Spec: *spec, Force: true}
+			return nil
+		case 'd':
+			container := tui.getSelectedContainer()
+			if container == nil {
+				tui.NotificationView.SetText("Error: no container selected").SetTextColor(errorNotificationColor)
+				return nil
+			}
+			modal := tui.newRemoveConfirmModal(container.Name, container)
+			tui.Pages.AddPage("confirm_remove", modal, true, false)
+			tui.Pages.SwitchToPage("confirm_remove")
+			return nil
+		case 'a':
+			// NOTE: bypasses CmdChan entirely because AttachIntoContainer needs direct terminal access
+			container := tui.getSelectedContainer()
+			if container == nil {
+				tui.NotificationView.SetText("Error: no container selected").SetTextColor(errorNotificationColor)
+				return nil
+			}
+			spec, err := manager.LoadSpec(container.ProjectPath)
+			if err != nil {
+				tui.NotificationView.SetText(fmt.Sprintf("Error: could not load spec: %s", err)).SetTextColor(errorNotificationColor)
+				return nil
+			}
+			tui.App.Suspend(func() {
+				spec.AttachIntoContainer()
+			})
 			return nil
 		default:
 			return event
@@ -474,4 +532,27 @@ func (t *TUI) collectProfiles() {
 		profiles = append(profiles, profile)
 	}
 	t.Profiles = profiles
+}
+
+func (t *TUI) newRemoveConfirmModal(containerName string, container *manager.Container) *tview.Modal {
+	modal := tview.NewModal().
+		SetText(fmt.Sprintf("Remove container %s?\nThis will also delete its image and .stormdrain/ directory.", containerName)).
+		AddButtons([]string{"Remove", "Cancel"}).
+		SetTextColor(defaultTextColor)
+	modal.SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+		if buttonIndex == 0 { // "Remove"
+			spec, err := manager.LoadSpec(container.ProjectPath)
+			if err != nil {
+				t.NotificationView.SetText(fmt.Sprintf("Error: could not load spec: %s", err)).
+					SetTextColor(errorNotificationColor)
+				t.Pages.SwitchToPage("main")
+				t.App.SetFocus(t.ContainerTable)
+				return
+			}
+			t.DataManager.CmdChan <- manager.Command{Type: manager.Remove, Spec: *spec}
+		}
+		t.Pages.SwitchToPage("main")
+		t.App.SetFocus(t.ContainerTable)
+	})
+	return modal
 }
