@@ -2,7 +2,7 @@
 
 Very opinionated take on declarative JSON profiles for sandboxed development environments.
 
-## structure
+## Structure
 
 Generally templates live in `~/.config/stormdrain/`, but practically they can be stored anywhere and pointed at with command line arguments during the creation stage of a new container. The primary config directory's contents include the following:
 
@@ -17,7 +17,7 @@ After creating a new profile inside a project directory by running `stormdrain n
 - `pod_spec.json` persists the container configuration (name, project path, image tag, volume mounts, env files, and such) for commands like `enter`, `close`, and `rm` to reference.
 - `configs/` is a temporary staging directory for config files copied during the build process. It is cleaned up automatically after container creation.
 
-## profiles
+## Profiles
 
 Profiles are the primary way of configuring and templating container environments. Besides apparent metadata like name and description, the following variables are supported:
 
@@ -32,9 +32,19 @@ Profiles are the primary way of configuring and templating container environment
 | `virtual_volumes` | Named podman volumes for persistent container-local storage (e.g. caches), each entry is `{ "name": <name>, "path": <path_on_container> }`, volumes are owned by the container user and (if named the same) shared across containers | `[]` |
 | `env_files` | Host `.env` files whose key-value pairs are injected as environment variables into the container at runtime | `[]` |
 
-## usage
+## Usage
 
-Simply put: `new` creates a container, `enter` attaches a shell, and `close` stops it. Permanent removal is done with `rm` (container, image, and `.stormdrain/` directory), or `purge` to apply this to all stormdrain containers and additionally clean up named volumes. More comprehensive commands list can be obtained via `help`.
+Project binaries can be built into `bin/` with `scripts/build.sh`. Out of these resulting binaries `stormdrain` is the primary TUI and `stormdrain_attach` a helper utility to simply attach to a named container (particularly useful when attaching to multiple containers simultaneously, as the TUI only allows attaching to one at a time).
+
+TUI keyboard mappings:
+
+- Navigation: `j`, `k`
+- Quit: `q`
+- New container (via form): `n`
+- Stop selected container: `s`
+- Kill (force stop) selected container: `x`
+- Removed selected container: `d`
+- Attach into selected container (suspends TUI): `a`
 
 ---
 
