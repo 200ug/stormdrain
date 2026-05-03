@@ -203,33 +203,31 @@ func (t *TUI) handleNotifications() {
 	}
 }
 
-func (t *TUI) updateDetails() {
+func (t *TUI) getSelectedContainer() *manager.Container {
 	if t.ActiveRow < 1 || t.ActiveRow >= t.ContainerTable.GetRowCount() {
-		t.DetailView.SetText("No container selected").SetTextColor(inactiveColor)
-		return
+		return nil
 	}
 	ref := t.ContainerTable.GetCell(t.ActiveRow, 0).GetReference()
 	if ref == nil {
-		t.DetailView.SetText("No container selected").SetTextColor(inactiveColor)
-		return
+		return nil
 	}
 	name, ok := ref.(string)
 	if !ok {
-		t.DetailView.SetText("No container selected").SetTextColor(inactiveColor)
-		return
+		return nil
 	}
 	t.DataManager.Mu.RLock()
-	var container manager.Container
-	found := false
+	defer t.DataManager.Mu.RUnlock()
 	for _, c := range t.DataManager.Containers {
 		if c.Name == name {
-			container = c
-			found = true
-			break
+			return &c
 		}
 	}
-	t.DataManager.Mu.RUnlock()
-	if !found {
+	return nil
+}
+
+func (t *TUI) updateDetails() {
+	container := t.getSelectedContainer()
+	if container == nil {
 		t.DetailView.SetText("No container selected").SetTextColor(inactiveColor)
 		return
 	}
