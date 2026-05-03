@@ -15,6 +15,9 @@ func main() {
 	}
 
 	t := tui.NewTUI(m, util.VersionCode)
+	if t == nil {
+		log.Fatalln("Error: TUI initialization failed")
+	}
 	if err := t.Run(); err != nil {
 		log.Fatalf("Error: %v", err)
 	}
