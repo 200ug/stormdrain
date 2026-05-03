@@ -309,11 +309,16 @@ func (s *Spec) WriteToDisk() error {
 // Kills and deletes the container and its build image. Also removes the related
 // .stormdrain/ directory from the given (project root) path.
 func (s *Spec) RemoveContainer() error {
-	if err := stopContainer(s.ContainerName, true); err != nil {
-		return err
-	}
-	if err := removeContainer(s.ContainerName); err != nil {
-		return err
+	exists, isRunning := containerExists(s.ContainerName)
+	if exists {
+		if isRunning {
+			if err := stopContainer(s.ContainerName, true); err != nil {
+				return err
+			}
+		}
+		if err := removeContainer(s.ContainerName); err != nil {
+			return err
+		}
 	}
 	if err := removeImage(s.ImageTag); err != nil {
 		return err
