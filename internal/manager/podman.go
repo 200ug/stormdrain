@@ -271,8 +271,9 @@ func (s *Spec) CreateContainer() error {
 		"--label", fmt.Sprintf("stormdrain.project-path=%s", s.ProjectPath),
 	}
 	if s.ProjectMount {
-		runArgs = append(runArgs, "-w", fmt.Sprintf("/home/dev/%s", s.ContainerName))
-		runArgs = append(runArgs, "-v", fmt.Sprintf("%s:/home/dev/%s", s.ProjectPath, s.ContainerName))
+		projectDirName := filepath.Base(s.ProjectPath)
+		runArgs = append(runArgs, "-w", fmt.Sprintf("/home/dev/%s", projectDirName))
+		runArgs = append(runArgs, "-v", fmt.Sprintf("%s:/home/dev/%s", s.ProjectPath, projectDirName))
 	}
 	for _, v := range s.VirtualVolumes {
 		runArgs = append(runArgs, "-v", fmt.Sprintf("%s:%s:U", v.Name, v.Path))
