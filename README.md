@@ -38,13 +38,15 @@ Project binaries can be built into `bin/` with `scripts/build.sh`. Out of these 
 
 TUI keyboard mappings:
 
-- Navigation: `j`, `k`
-- Quit: `q`
-- New container (via form): `n`
-- Stop selected container: `s`
-- Kill (force stop) selected container: `x`
-- Removed selected container: `d`
-- Attach into selected container (suspends TUI): `a`
+|  Mapping | Action |
+| - | - |
+| `j`, `k` | Navigation |
+| `q` | Quit |
+| `n` | New container (via form) |
+| `s` | Stop selected container |
+| `x` | Kill (force stop) selected container |
+| `d` | Removed selected container |
+| `a` | Attach into selected container (suspends TUI) |
 
 ---
 
