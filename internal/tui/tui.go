@@ -168,6 +168,11 @@ func NewTUI(m *manager.Manager, versionCode string) *TUI {
 			tui.Pages.AddPage("confirm_remove", modal, true, false)
 			tui.Pages.SwitchToPage("confirm_remove")
 			return nil
+		case 'p':
+			modal := tui.newPurgeConfirmModal()
+			tui.Pages.AddPage("confirm_purge", modal, true, false)
+			tui.Pages.SwitchToPage("confirm_purge")
+			return nil
 		case 'a':
 			// NOTE: bypasses CmdChan entirely because AttachIntoContainer needs direct terminal access
 			container := tui.getSelectedContainer()
@@ -573,6 +578,27 @@ func (t *TUI) newRemoveConfirmModal(containerName string, container *manager.Con
 				return
 			}
 			t.DataManager.CmdChan <- manager.Command{Type: manager.Remove, Spec: *spec}
+		}
+		t.Pages.SwitchToPage("main")
+		t.App.SetFocus(t.ContainerTable)
+	})
+	return modal
+}
+
+func (t *TUI) newPurgeConfirmModal() *tview.Modal {
+	t.DataManager.Mu.RLock()
+	count := len(t.DataManager.Containers)
+	t.DataManager.Mu.RUnlock()
+	
+	modal := tview.NewModal().
+		SetText(fmt.Sprintf("Purge all %d container(s)?\nThis will stop, remove, and delete all containers, their images, volumes, and .stormdrain/ directories. This cannot be undone.", count)).
+		AddButtons([]string{"Purge", "Cancel"}).
+		SetTextColor(defaultTextColor).
+		SetBackgroundColor(modalBgColor)
+	modal.SetBorderColor(modalBorderColor)
+	modal.SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+		if buttonIndex == 0 { // "Purge"
+			t.DataManager.CmdChan <- manager.Command{Type: manager.Purge}
 		}
 		t.Pages.SwitchToPage("main")
 		t.App.SetFocus(t.ContainerTable)
