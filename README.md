@@ -2,6 +2,8 @@
 
 Very opinionated take on declarative JSON profiles for sandboxed development environments.
 
+![TUI](./tui.png)
+
 ## Structure
 
 Generally templates live in `~/.config/stormdrain/`, but practically they can be stored anywhere and pointed at with command line arguments during the creation stage of a new container. The primary config directory's contents include the following:
