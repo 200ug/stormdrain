@@ -1,4 +1,4 @@
-package internal
+package util
 
 import (
 	"io/fs"
@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 )
+
+const VersionCode = "v2.0 (2026-05-05)"
 
 var Hostnames = []string{
 	"akarso",
@@ -69,12 +71,10 @@ func CopyDir(src, dst string, exclude []string) error {
 		if err != nil {
 			return err
 		}
-
 		rel, err := filepath.Rel(src, path)
 		if err != nil {
 			return err
 		}
-
 		for _, pattern := range exclude {
 			matched, _ := filepath.Match(pattern, rel)
 			if matched {
@@ -84,13 +84,10 @@ func CopyDir(src, dst string, exclude []string) error {
 				return nil
 			}
 		}
-
 		target := filepath.Join(dst, rel)
-
 		if d.IsDir() {
 			return os.MkdirAll(target, 0755)
 		}
-
 		return CopyFile(path, target)
 	})
 }
@@ -100,10 +97,5 @@ func CopyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-
-	if err = os.WriteFile(dst, data, 0755); err != nil {
-		return err
-	}
-
-	return nil
+	return os.WriteFile(dst, data, 0755)
 }
