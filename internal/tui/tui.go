@@ -589,7 +589,7 @@ func (t *TUI) newPurgeConfirmModal() *tview.Modal {
 	t.DataManager.Mu.RLock()
 	count := len(t.DataManager.Containers)
 	t.DataManager.Mu.RUnlock()
-	
+
 	modal := tview.NewModal().
 		SetText(fmt.Sprintf("Purge all %d container(s)?\nThis will stop, remove, and delete all containers, their images, volumes, and .stormdrain/ directories. This cannot be undone.", count)).
 		AddButtons([]string{"Purge", "Cancel"}).
