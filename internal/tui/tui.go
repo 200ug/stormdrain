@@ -88,7 +88,7 @@ func NewTUI(m *manager.Manager, versionCode string) *TUI {
 		SetDynamicColors(true).
 		SetChangedFunc(func() { app.Draw() })
 	detailView.SetBorder(true).
-		SetTitle(" Detail ").
+		SetTitle(" Details ").
 		SetTitleAlign(tview.AlignLeft).
 		SetTitleColor(titleColor)
 
