@@ -482,6 +482,17 @@ func (t *TUI) newCreateView() (*tview.Flex, *tview.Form) {
 			return
 		}
 
+		// validate: path must exist and be a directory
+		info, err := os.Stat(absProjectPath)
+		if err != nil {
+			errView.SetText(fmt.Sprintf("project path does not exist: %s", absProjectPath)).SetTextColor(errorNotificationColor)
+			return
+		}
+		if !info.IsDir() {
+			errView.SetText(fmt.Sprintf("project path is not a directory: %s", absProjectPath)).SetTextColor(errorNotificationColor)
+			return
+		}
+
 		// 2. substitute profile values to dockerfile template
 		configsDir := filepath.Join(t.UserHome, ".config", "stormdrain")
 		if err := selectedProfile.SubstituteDockerfileTemplate(configsDir, absProjectPath); err != nil {
