@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"codeberg.org/2ug/stormdrain/internal/util"
 )
@@ -246,7 +247,21 @@ func LoadSpec(projectPath string) (*Spec, error) {
 
 // Build and run a brand new container. If those steps are successful, the spec
 // will be written to the project's .stormdrain/ directory as pod_spec.json.
+// Regardless of the command's success, the podman commands' output will be logged
+// into project's .stormdrain/build.log (build context) for debugging purposes.
 func (s *Spec) CreateContainer() error {
+	logPath := filepath.Join(s.BuildCtx, "build.log")
+	logFile, err := os.Create(logPath) // O_TRUNC -> always overrides
+	if err != nil {
+		return fmt.Errorf("could not create build log file: %w", err)
+	}
+	defer logFile.Close()
+	// simple header for context
+	fmt.Fprintf(logFile, "### CONTAINER BUILD LOG ###\n")
+	fmt.Fprintf(logFile, "Timestamp: %s\n", time.Now().Format("2006-01-02 15:04:05"))
+	fmt.Fprintf(logFile, "Image: %s\n", s.ImageTag)
+	fmt.Fprintf(logFile, "Project: %s\n", s.ProjectPath)
+
 	// 1. build image from generated template
 	buildArgs := []string{
 		"build",
@@ -258,9 +273,9 @@ func (s *Spec) CreateContainer() error {
 	}
 	buildArgs = append(buildArgs, s.BuildCtx)
 	buildCmd := exec.Command("podman", buildArgs...)
-	buildCmd.Stdout = nil
-	buildCmd.Stderr = nil
-	err := buildCmd.Run()
+	buildCmd.Stdout = logFile
+	buildCmd.Stderr = logFile
+	err = buildCmd.Run()
 	if err != nil {
 		return err
 	}
@@ -291,8 +306,9 @@ func (s *Spec) CreateContainer() error {
 	}
 	runArgs = append(runArgs, s.ImageTag)
 	runCmd := exec.Command("podman", runArgs...)
-	runCmd.Stdout = nil
-	runCmd.Stderr = nil
+	fmt.Fprintf(logFile, "\n### CONTAINER RUN (CREATE) LOG ###\n")
+	runCmd.Stdout = logFile
+	runCmd.Stderr = logFile
 	if err := runCmd.Run(); err != nil {
 		return err
 	}
