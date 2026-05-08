@@ -15,11 +15,11 @@ func init() {
 
 func neWLinuxStats() PodmanStats {
 	return PodmanStats{
-		IsNative: true,
-		MachineName: "native",
-		AvailableTotalCPUs: runtime.NumCPU(),
+		IsNative:               true,
+		MachineName:            "native",
+		AvailableTotalCPUs:     runtime.NumCPU(),
 		AvailableTotalMemoryGB: totalMemoryGBFromProc(),
-		AvailableDiskSizeGB: -1,
+		AvailableDiskSizeGB:    -1,
 	}
 }
 
@@ -43,4 +43,3 @@ func totalMemoryGBFromProc() int {
 	}
 	return -1
 }
-

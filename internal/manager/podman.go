@@ -21,7 +21,7 @@ const (
 // Static statistics that can be queried on tool startup. They won't change
 // unless the active Podman machine is stopped and modified.
 type PodmanStats struct {
-	IsNative bool
+	IsNative               bool
 	MachineName            string
 	AvailableTotalCPUs     int
 	AvailableTotalMemoryGB int
@@ -42,7 +42,7 @@ func NewPodmanStats(rawMachineStats *machineStats) PodmanStats {
 		diskSize = diskSize / 1_000_000_000
 	}
 	return PodmanStats{
-		IsNative: false,
+		IsNative:               false,
 		MachineName:            rawMachineStats.Name,
 		AvailableTotalCPUs:     rawMachineStats.CPUs,
 		AvailableTotalMemoryGB: memory,
