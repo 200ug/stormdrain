@@ -23,17 +23,21 @@ func NewManager(fullInit bool) (*Manager, error) {
 	if !podmanInPath() {
 		return nil, fmt.Errorf("podman not in PATH")
 	}
-	rawMachineStats, err := ensurePodmanMachineIsRunning()
-	if err != nil {
-		return nil, err
+
+	var podmanStats PodmanStats
+	if IsDarwin {
+		rawMachineStats, err := ensurePodmanMachineIsRunning()
+		if err != nil {
+			return nil, err
+		}
+		podmanStats = NewPodmanStats(rawMachineStats)
+	} else {
+		podmanStats = neWLinuxStats()
 	}
 	if !fullInit {
-		// return early if we just want to perform the check, but don't need stats
+		// return early if we just want to perform the check(s), but don't need stats
 		return nil, nil
 	}
-
-	// query some general stats of the active podman machine
-	podmanStats := NewPodmanStats(rawMachineStats)
 
 	// look up stormdrain related containers
 	containers, err := getStormdrainContainers()

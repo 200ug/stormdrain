@@ -21,6 +21,7 @@ const (
 // Static statistics that can be queried on tool startup. They won't change
 // unless the active Podman machine is stopped and modified.
 type PodmanStats struct {
+	IsNative bool
 	MachineName            string
 	AvailableTotalCPUs     int
 	AvailableTotalMemoryGB int
@@ -41,6 +42,7 @@ func NewPodmanStats(rawMachineStats *machineStats) PodmanStats {
 		diskSize = diskSize / 1_000_000_000
 	}
 	return PodmanStats{
+		IsNative: false,
 		MachineName:            rawMachineStats.Name,
 		AvailableTotalCPUs:     rawMachineStats.CPUs,
 		AvailableTotalMemoryGB: memory,
@@ -65,8 +67,10 @@ type machineStats struct {
 	DiskSize string `json:"DiskSize"`
 }
 
-// Attempts to start the default Podman machine if it's not running. Returns
-// the commands parsed output for the started/running machine.
+// Attempts to start the default Podman machine (VM) if it's not running.
+// Returns the command's parsed output for the default/running machine, which
+// can be fed to TUI as VM statistics. Notably skipped on all platforms except
+// for Darwin.
 func ensurePodmanMachineIsRunning() (*machineStats, error) {
 	rawList, err := exec.Command("podman", "machine", "list", "--format", "json").Output()
 	if err != nil {
