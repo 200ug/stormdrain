@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-const VersionCode = "v2.0 (2026-05-05)"
+const VersionCode = "v2.1 (2026-05-08)"
 
 var Hostnames = []string{
 	"akarso",
