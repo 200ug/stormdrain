@@ -118,8 +118,7 @@ func NewTUI(m *manager.Manager, versionCode string) *TUI {
 		case 'n':
 			createView, form := tui.newCreateView()
 			if createView == nil {
-				tui.NotificationView.SetText("Error: could not initialize container creation view").
-					SetTextColor(errorNotificationColor)
+				tui.showErrror("Error: could not initialize container creation view")
 				return nil
 			}
 			tui.Pages.AddPage("create", createView, true, false)
@@ -129,39 +128,36 @@ func NewTUI(m *manager.Manager, versionCode string) *TUI {
 		case 's':
 			container := tui.getSelectedContainer()
 			if container == nil {
-				tui.NotificationView.SetText("Error: no container selected").
-					SetTextColor(errorNotificationColor)
+				tui.showErrror("Error: no container selected")
 				return nil
 			}
 			spec, err := manager.LoadSpec(container.ProjectPath)
 			if err != nil {
-				tui.NotificationView.SetText(fmt.Sprintf("Error: could not load spec: %s", err)).
-					SetTextColor(errorNotificationColor)
+				tui.showErrror(fmt.Sprintf("Error: could not load spec: %s", err))
 				return nil
 			}
 			tui.DataManager.CmdChan <- manager.Command{Type: manager.Stop, Spec: *spec, Force: false}
+			tui.showNotification("Stopping container...")
 			return nil
 		case 'x':
 			// identical to stopping, but with Force = true (i.e. kill)
 			container := tui.getSelectedContainer()
 			if container == nil {
-				tui.NotificationView.SetText("Error: no container selected").
-					SetTextColor(errorNotificationColor)
+				tui.showErrror("Error: no container selected")
 				return nil
 			}
 			spec, err := manager.LoadSpec(container.ProjectPath)
 			if err != nil {
-				tui.NotificationView.SetText(fmt.Sprintf("Error: could not load spec: %s", err)).
-					SetTextColor(errorNotificationColor)
+				tui.showErrror(fmt.Sprintf("Error: could not load spec: %s", err))
 				return nil
 			}
 			tui.DataManager.CmdChan <- manager.Command{Type: manager.Stop, Spec: *spec, Force: true}
+			tui.showNotification("Killing container...")
 			return nil
 		case 'd':
 			container := tui.getSelectedContainer()
 			if container == nil {
-				tui.NotificationView.SetText("Error: no container selected").
-					SetTextColor(errorNotificationColor)
+				tui.showErrror("Error: no container selected")
 				return nil
 			}
 			modal := tui.newRemoveConfirmModal(container.Name, container)
@@ -177,21 +173,18 @@ func NewTUI(m *manager.Manager, versionCode string) *TUI {
 			// NOTE: bypasses CmdChan entirely because AttachIntoContainer needs direct terminal access
 			container := tui.getSelectedContainer()
 			if container == nil {
-				tui.NotificationView.SetText("Error: no container selected").
-					SetTextColor(errorNotificationColor)
+				tui.showErrror("Error: no container selected")
 				return nil
 			}
 			spec, err := manager.LoadSpec(container.ProjectPath)
 			if err != nil {
-				tui.NotificationView.SetText(fmt.Sprintf("Error: could not load spec: %s", err)).
-					SetTextColor(errorNotificationColor)
+				tui.showErrror(fmt.Sprintf("Error: could not load spec: %s", err))
 				return nil
 			}
 			tui.App.Suspend(func() { // blocks here until we detach from the container session
 				spec.AttachIntoContainer()
 			})
-			tui.NotificationView.SetText("Restored previous state successfully").
-				SetTextColor(notificationColor)
+			tui.showNotification("Restored previous state successfully")
 			tui.updateContainerTable()
 			tui.updateDetails()
 			return nil
@@ -274,11 +267,9 @@ func (t *TUI) handleNotifications() {
 	}
 	select {
 	case msg := <-t.DataManager.NotifChan:
-		t.notifSetAt = time.Now()
-		t.NotificationView.SetText(fmt.Sprintf("%s", msg)).SetTextColor(notificationColor)
+		t.showNotification(msg)
 	case err := <-t.DataManager.ErrChan:
-		t.notifSetAt = time.Now()
-		t.NotificationView.SetText(fmt.Sprintf("Error: %s", err)).SetTextColor(errorNotificationColor)
+		t.showErrror(fmt.Sprintf("Error: %s", err))
 	default:
 	}
 }
@@ -519,6 +510,7 @@ func (t *TUI) newCreateView() (*tview.Flex, *tview.Form) {
 
 		// 5. send create command to backend manager (handles CreateContainer + WriteToDisk + CleanupStagedConfigs)
 		t.DataManager.CmdChan <- manager.Command{Type: manager.Create, Spec: *spec}
+		t.showNotification("Creating container...")
 
 		t.Pages.SwitchToPage("main")
 		t.App.SetFocus(t.ContainerTable)
@@ -582,13 +574,13 @@ func (t *TUI) newRemoveConfirmModal(containerName string, container *manager.Con
 		if buttonIndex == 0 { // "Remove"
 			spec, err := manager.LoadSpec(container.ProjectPath)
 			if err != nil {
-				t.NotificationView.SetText(fmt.Sprintf("Error: could not load spec: %s", err)).
-					SetTextColor(errorNotificationColor)
+				t.showErrror(fmt.Sprintf("Error: could not load spec: %s", err))
 				t.Pages.SwitchToPage("main")
 				t.App.SetFocus(t.ContainerTable)
 				return
 			}
 			t.DataManager.CmdChan <- manager.Command{Type: manager.Remove, Spec: *spec}
+			t.showNotification("Removing container...")
 		}
 		t.Pages.SwitchToPage("main")
 		t.App.SetFocus(t.ContainerTable)
@@ -610,9 +602,20 @@ func (t *TUI) newPurgeConfirmModal() *tview.Modal {
 	modal.SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 		if buttonIndex == 0 { // "Purge"
 			t.DataManager.CmdChan <- manager.Command{Type: manager.Purge}
+			t.showNotification("Purging all containers, images, and volumes...")
 		}
 		t.Pages.SwitchToPage("main")
 		t.App.SetFocus(t.ContainerTable)
 	})
 	return modal
+}
+
+func (t *TUI) showNotification(text string) {
+	t.NotificationView.SetText(text).SetTextColor(notificationColor)
+	t.notifSetAt = time.Now()
+}
+
+func (t *TUI) showErrror(text string) {
+	t.NotificationView.SetText(text).SetTextColor(errorNotificationColor)
+	t.notifSetAt = time.Now()
 }
