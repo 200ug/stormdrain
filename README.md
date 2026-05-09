@@ -1,6 +1,6 @@
 # stormdrain
 
-Very opinionated take on declarative JSON profiles for sandboxed development environments.
+Very opinionated take on declarative configuration/management system for "dev containers" (via rootless Podman).
 
 ![TUI](./tui.png)
 
