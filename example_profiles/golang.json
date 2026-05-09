@@ -13,6 +13,9 @@
     "configs": [
         { "src": "~/.zshrc", "dst": "~/." }
     ],
+    "ports": [
+        { "host": 8080, "container": 8080 }
+    ],
     "virtual_volumes": [
         { "path": "/go/pkg/mod", "name": "go-mod-cache" },
         { "path": "/home/dev/.cache/go-build", "name": "go-build-cache" }
