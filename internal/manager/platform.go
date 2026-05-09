@@ -13,7 +13,7 @@ func init() {
 	IsDarwin = runtime.GOOS == "darwin"
 }
 
-func neWLinuxStats() PodmanStats {
+func newLinuxStats() PodmanStats {
 	return PodmanStats{
 		IsNative:               true,
 		MachineName:            "native",

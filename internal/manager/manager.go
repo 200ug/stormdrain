@@ -32,7 +32,7 @@ func NewManager(fullInit bool) (*Manager, error) {
 		}
 		podmanStats = NewPodmanStats(rawMachineStats)
 	} else {
-		podmanStats = neWLinuxStats()
+		podmanStats = newLinuxStats()
 	}
 	if !fullInit {
 		// return early if we just want to perform the check(s), but don't need stats
