@@ -25,7 +25,7 @@ func NewManager(fullInit bool) (*Manager, error) {
 	}
 
 	var podmanStats PodmanStats
-	if IsDarwin {
+	if IsDarwin() {
 		rawMachineStats, err := ensurePodmanMachineIsRunning()
 		if err != nil {
 			return nil, err

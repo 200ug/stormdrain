@@ -7,10 +7,8 @@ import (
 	"strings"
 )
 
-var IsDarwin bool
-
-func init() {
-	IsDarwin = runtime.GOOS == "darwin"
+func IsDarwin() bool {
+	return runtime.GOOS == "darwin"
 }
 
 func newLinuxStats() PodmanStats {

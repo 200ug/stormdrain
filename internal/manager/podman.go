@@ -289,6 +289,11 @@ func (s *Spec) CreateContainer() error {
 		"--label", "stormdrain",
 		"--label", fmt.Sprintf("stormdrain.project-path=%s", s.ProjectPath),
 	}
+	if !IsDarwin() {
+		// map host UID to the same UID inside the container ("dev" instead of "root")
+		// (on macOS Podman's VM handles UID/GID mapping transparenly with virtiofs filesystem sharing)
+		runArgs = append(runArgs, "--userns=keep-id")
+	}
 	if s.ProjectMount {
 		projectDirName := filepath.Base(s.ProjectPath)
 		runArgs = append(runArgs, "-w", fmt.Sprintf("/home/dev/%s", projectDirName))
