@@ -137,7 +137,7 @@ func NewTUI(m *manager.Manager, versionCode string) *TUI {
 				return nil
 			}
 			tui.DataManager.CmdChan <- manager.Command{Type: manager.Stop, Spec: *spec, Force: false}
-			tui.showNotification("Stopping container...")
+			tui.showNotification("Stopping container...", true)
 			return nil
 		case 'x':
 			// identical to stopping, but with Force = true (i.e. kill)
@@ -152,7 +152,7 @@ func NewTUI(m *manager.Manager, versionCode string) *TUI {
 				return nil
 			}
 			tui.DataManager.CmdChan <- manager.Command{Type: manager.Stop, Spec: *spec, Force: true}
-			tui.showNotification("Killing container...")
+			tui.showNotification("Killing container...", true)
 			return nil
 		case 'd':
 			container := tui.getSelectedContainer()
@@ -184,7 +184,7 @@ func NewTUI(m *manager.Manager, versionCode string) *TUI {
 			tui.App.Suspend(func() { // blocks here until we detach from the container session
 				spec.AttachIntoContainer()
 			})
-			tui.showNotification("Restored previous state successfully")
+			tui.showNotification("Restored previous state successfully", false)
 			tui.updateContainerTable()
 			tui.updateDetails()
 			return nil
@@ -267,7 +267,7 @@ func (t *TUI) handleNotifications() {
 	}
 	select {
 	case msg := <-t.DataManager.NotifChan:
-		t.showNotification(msg)
+		t.showNotification(msg, false)
 	case err := <-t.DataManager.ErrChan:
 		t.showErrror(fmt.Sprintf("Error: %s", err))
 	default:
@@ -510,7 +510,7 @@ func (t *TUI) newCreateView() (*tview.Flex, *tview.Form) {
 
 		// 5. send create command to backend manager (handles CreateContainer + WriteToDisk + CleanupStagedConfigs)
 		t.DataManager.CmdChan <- manager.Command{Type: manager.Create, Spec: *spec}
-		t.showNotification("Creating container...")
+		t.showNotification("Creating container...", true)
 
 		t.Pages.SwitchToPage("main")
 		t.App.SetFocus(t.ContainerTable)
@@ -580,7 +580,7 @@ func (t *TUI) newRemoveConfirmModal(containerName string, container *manager.Con
 				return
 			}
 			t.DataManager.CmdChan <- manager.Command{Type: manager.Remove, Spec: *spec}
-			t.showNotification("Removing container...")
+			t.showNotification("Removing container...", true)
 		}
 		t.Pages.SwitchToPage("main")
 		t.App.SetFocus(t.ContainerTable)
@@ -602,7 +602,7 @@ func (t *TUI) newPurgeConfirmModal() *tview.Modal {
 	modal.SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 		if buttonIndex == 0 { // "Purge"
 			t.DataManager.CmdChan <- manager.Command{Type: manager.Purge}
-			t.showNotification("Purging all containers, images, and volumes...")
+			t.showNotification("Purging all containers, images, and volumes...", true)
 		}
 		t.Pages.SwitchToPage("main")
 		t.App.SetFocus(t.ContainerTable)
@@ -610,9 +610,11 @@ func (t *TUI) newPurgeConfirmModal() *tview.Modal {
 	return modal
 }
 
-func (t *TUI) showNotification(text string) {
+func (t *TUI) showNotification(text string, skipClearing bool) {
 	t.NotificationView.SetText(text).SetTextColor(notificationColor)
-	t.notifSetAt = time.Now()
+	if !skipClearing {
+		t.notifSetAt = time.Now()
+	}
 }
 
 func (t *TUI) showErrror(text string) {
