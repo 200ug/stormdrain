@@ -262,8 +262,7 @@ func (t *TUI) updateHeader() {
 
 func (t *TUI) handleNotifications() {
 	if !t.notifSetAt.IsZero() && time.Since(t.notifSetAt) > notifTTL {
-		t.NotificationView.SetText("")
-		t.notifSetAt = time.Time{}
+		t.cleanNotification()
 	}
 	select {
 	case msg := <-t.DataManager.NotifChan:
@@ -396,6 +395,8 @@ func (t *TUI) navigateTable(direction NaviDirection) {
 }
 
 func (t *TUI) newCreateView() (*tview.Flex, *tview.Form) {
+	t.cleanNotification()
+
 	t.collectProfiles()
 	if len(t.Profiles) == 0 {
 		return nil, nil
@@ -615,6 +616,11 @@ func (t *TUI) showNotification(text string, skipClearing bool) {
 	if !skipClearing {
 		t.notifSetAt = time.Now()
 	}
+}
+
+func (t *TUI) cleanNotification() {
+	t.NotificationView.SetText("")
+	t.notifSetAt = time.Time{}
 }
 
 func (t *TUI) showErrror(text string) {
