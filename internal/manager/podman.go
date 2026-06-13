@@ -333,8 +333,10 @@ func (s *Spec) WriteToDisk() error {
 	return os.WriteFile(specPath, formattedJson, 0644)
 }
 
-// Kills and deletes the container and its build image. Also removes the related
-// .stormdrain/ directory from the given (project root) path.
+// Kills and deletes the container and its build image. Removes the container-specific
+// subdirectory from within the project's .stormdrain directory, and also the parent
+// directory if no other containers exists for the project (i.e. the .stormdrain/ dir.
+// is empty after the latest deletion).
 func (s *Spec) RemoveContainer() error {
 	exists, isRunning := containerExists(s.ContainerName)
 	if exists {
@@ -350,7 +352,26 @@ func (s *Spec) RemoveContainer() error {
 	if err := removeImage(s.ImageTag); err != nil {
 		return err
 	}
-	return os.RemoveAll(filepath.Join(s.ProjectPath, ".stormdrain", s.ContainerName))
+	return removeContainerDirs(s.ProjectPath, s.ContainerName)
+}
+
+func removeContainerDirs(projectPath, containerName string) error {
+	sdDir := filepath.Join(projectPath, ".stormdrain")
+	containerDir := filepath.Join(sdDir, containerName)
+
+	if err := os.RemoveAll(containerDir); err != nil {
+		return err
+	}
+
+	entries, err := os.ReadDir(sdDir)
+	if err != nil {
+		// nothing to clean up if parent doesn't exist or isn't readable
+		return nil
+	}
+	if len(entries) == 0 {
+		return os.Remove(sdDir)
+	}
+	return nil
 }
 
 func (s *Spec) AttachIntoContainer() error {
