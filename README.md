@@ -1,44 +1,47 @@
 # stormdrain
 
-Very opinionated take on declarative configuration/management system for "dev containers" (via rootless Podman).
+Opinionated take on a declarative dev container management tool. Built directly on top of rootless Podman command line interface.
 
-![TUI](./tui.png)
+![TUI landing page](./tui.png)
 
-## Structure
+## Basics
 
-Generally templates live in `~/.config/stormdrain/`, but practically they can be stored anywhere and pointed at with command line arguments during the creation stage of a new container. The primary config directory's contents include the following:
+### Quickstart
 
-- `Dockerfile.base` acts as the base template image for all new containers. Placeholders (`{{PROFILE_PKGS}}`, `{{PROFILE_DIRS}}`, `{{PROFILE_INSTALLERS}}`, and `{{PROFILE_CONFIGS}}`) are substituted with commands derived from the active profile.
-- `profiles/` contains individual JSON profiles, each describing one environment (packages, toolchains, config mounts, volumes, etc.). See `example_profiles/` for a few basic examples.
+Run the included `scripts/init.sh` shell script to copy the example profiles and the base template into `~/.config/stormdrain`. Then run `scripts/build.sh` which produces the plug-and-play binaries into `bin`.
 
-This layout can be initialized with `scripts/init.sh`, which populates the aforementioned config directory with the example profiles and the Dockerfile shipped with this repository.
+### Profiles
 
-After creating a new profile inside a project directory by running `stormdrain new <profile>` (or `stormdrain new -f <profile_path>`), a `.stormdrain/` directory is created. This is the place where the tool persists the configurations and other metadata specific to that particular project. It's advisable to simply gitignore this. The directory's contents include the following:
+Declarative JSON configuration files, "profiles", form up the base layer for the tool's functionality. The hardcoded location for these is currently `~/.config/stormdrain/profiles`. More comprehensive examples of these config files are available in `example_profiles`, but in general the system abides the following directives:
 
-- `Dockerfile.sd` is the substituted Dockerfile generated from `Dockerfile.base` and the active profile.
-- `pod_spec.json` persists the container configuration (name, project path, image tag, volume mounts, env files, and such) for commands like `enter`, `close`, and `rm` to reference.
-- `configs/` is a temporary staging directory for config files copied during the build process. It is cleaned up automatically after container creation.
+- `shell`: Login shell for the container user (`dev` by default), defaults to `/bin/zsh`
+- `packages`: List of APT packages to install during image build
+- `installers`: List of shell commands (or multiple chained commands) executed during image build (by the container user, needs `sudo` for root)
+    - An unstructured way to expand the configuration to be compatible with e.g. multistep installation scripts (see `example_profiles/golang.json`)
+- `configs`: Host files/dirs to copy into the image at build time
+    - Format: `{ "src": <path>, "dst": <path>, "exclude": <pattern> }`
+- `project_mount`: Whether to bind-mount the project directory into the container at `/home/dev/<project>` and set it as the working dir, defaults to `true`
+- `ports`: Host-to-container port forwarding
+    - Format: `{ "host": <port>, "container": <port> }`
+- `virtual_volumes`: Named podman volumes (owned by the container user, `dev` by default) for persistent container-local storage (e.g. caches)
+    - Format: `{ "name": <name>, "path": <path_on_container> }`
+- `env_files`: Host `.env` files whose key-value pairs are injected as environment variables into the container at runtime
 
-## Profiles
+Notably variables like ports, volume mounts, project mount, etc. are also configurable via the container recreation view (mapped to `e` by default) so that the profiles don't need to be adjusted to accompany every little per-project modification.
 
-Profiles are the primary way of configuring and templating container environments. Besides apparent metadata like name and description, the following variables are supported:
+### Container creation
 
-| Variable | Description | Defaults |
-| - | - | - |
-| `shell` | Login shell for the container user (`dev` by default) | `/bin/zsh` |
-| `packages` | List of APT packages to install during image build | `[]` |
-| `installers` | Shell commands executed during image build (by the container user, needs `sudo` for root), basically a way to expand the otherwise structured configuration | `[]` |
-| `configs` | Host files/dirs to copy into the image at build time, each entry is `{ "src": <path>, "dst": <path>, "exclude": <pattern> }` | `[]` |
-| `project_mount` | Whether to bind-mount the project directory into the container at /home/dev/<project> and set it as the working dir, set to `false` to disable | `true` |
-| `ports` | Host-to-container port forwarding. Each entry is `{ "host": <port>, "container": <port> }` | `[]` |
-| `virtual_volumes` | Named podman volumes for persistent container-local storage (e.g. caches), each entry is `{ "name": <name>, "path": <path_on_container> }`, volumes are owned by the container user and (if named the same) shared across containers | `[]` |
-| `env_files` | Host `.env` files whose key-value pairs are injected as environment variables into the container at runtime | `[]` |
+During the container creation process, the configurations from the selected profile and the creation view are injected into a base template container image (`Dockerfile.base` by default, uses `buildpack-deps:trixie` as the base image) by replacing the existing placeholders (`{{PROFILE_PKGS}}`, `{{PROFILE_DIRS}}`, `{{PROFILE_INSTALLERS}}`, and `{{PROFILE_CONFIGS}}`).
 
-## Usage
+To persist the container configurations across (container) reboots and recreations, a `.stormdrain` directory is created to the given project root. Inside it will be scoped directories for each container of that particular workspace, and within those subdirectories will be the following files:
 
-Project binaries can be built into `bin/` with `scripts/build.sh`. Out of these resulting binaries `stormdrain` is the primary TUI and `stormdrain_attach` a helper utility to simply attach to a named container (particularly useful when attaching to multiple containers simultaneously, as the TUI only allows attaching to one at a time).
+- `Dockerfile.sd`: The substituted Dockerfile where the user-given configurations are combined with `Dockerfile.base`
+- `pod_spec.json`: The actual container config, stores metadata like name, project path, image tag, volume mounts, etc.
+- `build.log`/`recreate.log`: Log files produced during initial container creation and recreation (triggered by configuration changes)
 
-TUI keyboard mappings:
+Besides the aforementioned directories, a temporary `configs` directory will be created to stage the copiable dotfiles into the container's build scope. It's cleaned up automatically after the container creation process finishes.
+
+### Keyboard mappings
 
 |  Key | Action |
 | - | - |
@@ -48,7 +51,8 @@ TUI keyboard mappings:
 | `e` | Edit container config (ports, volumes, env files, project mount) |
 | `s` | Stop selected container |
 | `x` | Kill (force stop) selected container |
-| `d` | Removed selected container |
+| `d` | Remove selected container |
+| `p` | Purge all existing (stormdrain) containers, images, volumes, and `.stormdrain` directories |
 | `a` | Attach into selected container (suspends TUI) |
 
 ---
