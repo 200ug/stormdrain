@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"codeberg.org/2ug/stormdrain/internal/manager"
 	"github.com/gdamore/tcell/v2"
@@ -20,9 +21,9 @@ type NaviDirection int
 const (
 	NaviUp NaviDirection = iota
 	NaviDown
-)
 
-const (
+	defaultMaxContentHeight = 0.8
+
 	notifTTL = 15 * time.Second
 
 	defaultTextColor       = tcell.ColorWhite
@@ -50,6 +51,8 @@ type TUI struct {
 	ContainerTable   *tview.Table
 	DetailView       *tview.TextView
 	notifSetAt       time.Time
+	screenWidth      int
+	screenHeight     int
 }
 
 func NewTUI(m *manager.Manager, versionCode string) *TUI {
@@ -118,22 +121,37 @@ func NewTUI(m *manager.Manager, versionCode string) *TUI {
 		case 'n':
 			createView, form := tui.newCreateView()
 			if createView == nil {
-				tui.showErrror("Error: could not initialize container creation view")
+				tui.showError("Error: could not initialize container creation view")
 				return nil
 			}
 			tui.Pages.AddPage("create", createView, true, false)
 			tui.Pages.SwitchToPage("create")
 			tui.App.SetFocus(form)
 			return nil
+		case 'e':
+			container := tui.getSelectedContainer()
+			if container == nil {
+				tui.showError("Error: no container selected")
+				return nil
+			}
+			editView, form := tui.newEditView(container)
+			if editView == nil {
+				tui.showError("Error: could not load container spec")
+				return nil
+			}
+			tui.Pages.AddPage("edit", editView, true, false)
+			tui.Pages.SwitchToPage("edit")
+			tui.App.SetFocus(form)
+			return nil
 		case 's':
 			container := tui.getSelectedContainer()
 			if container == nil {
-				tui.showErrror("Error: no container selected")
+				tui.showError("Error: no container selected")
 				return nil
 			}
 			spec, err := manager.LoadSpec(container.ProjectPath, container.Name)
 			if err != nil {
-				tui.showErrror(fmt.Sprintf("Error: could not load spec: %s", err))
+				tui.showError(fmt.Sprintf("Error: could not load spec: %s", err))
 				return nil
 			}
 			tui.DataManager.CmdChan <- manager.Command{Type: manager.Stop, Spec: *spec, Force: false}
@@ -143,12 +161,12 @@ func NewTUI(m *manager.Manager, versionCode string) *TUI {
 			// identical to stopping, but with Force = true (i.e. kill)
 			container := tui.getSelectedContainer()
 			if container == nil {
-				tui.showErrror("Error: no container selected")
+				tui.showError("Error: no container selected")
 				return nil
 			}
 			spec, err := manager.LoadSpec(container.ProjectPath, container.Name)
 			if err != nil {
-				tui.showErrror(fmt.Sprintf("Error: could not load spec: %s", err))
+				tui.showError(fmt.Sprintf("Error: could not load spec: %s", err))
 				return nil
 			}
 			tui.DataManager.CmdChan <- manager.Command{Type: manager.Stop, Spec: *spec, Force: true}
@@ -157,7 +175,7 @@ func NewTUI(m *manager.Manager, versionCode string) *TUI {
 		case 'd':
 			container := tui.getSelectedContainer()
 			if container == nil {
-				tui.showErrror("Error: no container selected")
+				tui.showError("Error: no container selected")
 				return nil
 			}
 			modal := tui.newRemoveConfirmModal(container.Name, container)
@@ -173,12 +191,12 @@ func NewTUI(m *manager.Manager, versionCode string) *TUI {
 			// NOTE: bypasses CmdChan entirely because AttachIntoContainer needs direct terminal access
 			container := tui.getSelectedContainer()
 			if container == nil {
-				tui.showErrror("Error: no container selected")
+				tui.showError("Error: no container selected")
 				return nil
 			}
 			spec, err := manager.LoadSpec(container.ProjectPath, container.Name)
 			if err != nil {
-				tui.showErrror(fmt.Sprintf("Error: could not load spec: %s", err))
+				tui.showError(fmt.Sprintf("Error: could not load spec: %s", err))
 				return nil
 			}
 			tui.App.Suspend(func() { // blocks here until we detach from the container session
@@ -206,6 +224,10 @@ func NewTUI(m *manager.Manager, versionCode string) *TUI {
 		ContainerTable:   containerTable,
 		DetailView:       detailView,
 	}
+
+	app.SetAfterDrawFunc(func(screen tcell.Screen) {
+		tui.screenWidth, tui.screenHeight = screen.Size()
+	})
 
 	return tui
 }
@@ -268,7 +290,7 @@ func (t *TUI) handleNotifications() {
 	case msg := <-t.DataManager.NotifChan:
 		t.showNotification(msg, false)
 	case err := <-t.DataManager.ErrChan:
-		t.showErrror(fmt.Sprintf("Error: %s", err))
+		t.showError(fmt.Sprintf("Error: %s", err))
 	default:
 	}
 }
@@ -313,9 +335,6 @@ func (t *TUI) updateContainerTable() {
 			}
 		}
 	}
-
-	// TODO: only re-draw the table *if* there's running containers (i.e.
-	//		 we still need to query data, but not necessarily clear and draw)
 
 	t.ContainerTable.Clear()
 
@@ -392,6 +411,125 @@ func (t *TUI) navigateTable(direction NaviDirection) {
 			nextRow++
 		}
 	}
+}
+
+func (t *TUI) newEditView(container *manager.Container) (*tview.Flex, *tview.Form) {
+	t.cleanNotification()
+
+	spec, err := manager.LoadSpec(container.ProjectPath, container.Name)
+	if err != nil {
+		t.showError(fmt.Sprintf("Error: could not load spec: %s", err))
+		return nil, nil
+	}
+
+	form := tview.NewForm()
+	form.SetBorder(true).
+		SetTitle(" Edit Container ").
+		SetTitleAlign(tview.AlignLeft).
+		SetTitleColor(titleColor)
+	form.SetFieldBackgroundColor(modalBgColor)
+	form.SetFieldTextColor(tcell.ColorWhite)
+	form.SetLabelColor(titleColor)
+	form.SetButtonBackgroundColor(tcell.ColorDarkCyan)
+	form.SetButtonTextColor(tcell.ColorWhite)
+
+	form.AddCheckbox("Project mount", spec.ProjectMount, nil)
+	form.AddInputField("Ports", formatPorts(spec.Ports), 50, nil, nil)
+	form.AddInputField("Virtual volumes", formatVirtualVolumes(spec.VirtualVolumes), 50, nil, nil)
+	form.AddInputField("Env files", formatEnvFiles(spec.EnvFiles), 50, nil, nil)
+
+	errView := tview.NewTextView().
+		SetDynamicColors(true).
+		SetChangedFunc(func() { t.App.Draw() })
+	errView.SetTextColor(errorNotificationColor)
+
+	returnToMain := func() {
+		errView.SetText("")
+		t.Pages.SwitchToPage("main")
+		t.App.SetFocus(t.ContainerTable)
+	}
+
+	form.AddButton("Save", func() {
+		errView.SetText("")
+
+		ports, err := parsePorts(form.GetFormItem(1).(*tview.InputField).GetText())
+		if err != nil {
+			errView.SetText(fmt.Sprintf("invalid ports: %s", err)).SetTextColor(errorNotificationColor)
+			return
+		}
+		volumes, err := parseVirtualVolumes(form.GetFormItem(2).(*tview.InputField).GetText())
+		if err != nil {
+			errView.SetText(fmt.Sprintf("invalid virtual volumes: %s", err)).SetTextColor(errorNotificationColor)
+			return
+		}
+		envFiles, err := parseEnvFiles(form.GetFormItem(3).(*tview.InputField).GetText())
+		if err != nil {
+			errView.SetText(fmt.Sprintf("invalid env files: %s", err)).SetTextColor(errorNotificationColor)
+			return
+		}
+
+		for _, ef := range envFiles {
+			expanded := os.ExpandEnv(strings.Replace(ef, "~", t.UserHome, 1))
+			if _, err := os.Stat(expanded); err != nil {
+				errView.SetText(fmt.Sprintf("env file does not exist: %s", ef)).SetTextColor(errorNotificationColor)
+				return
+			}
+		}
+
+		spec.ProjectMount = form.GetFormItem(0).(*tview.Checkbox).IsChecked()
+		spec.Ports = ports
+		spec.VirtualVolumes = volumes
+		spec.EnvFiles = envFiles
+
+		t.DataManager.CmdChan <- manager.Command{Type: manager.Recreate, Spec: *spec}
+		t.showNotification(fmt.Sprintf("Recreating container '%s'...", spec.Hostname), true)
+
+		t.Pages.SwitchToPage("main")
+		t.App.SetFocus(t.ContainerTable)
+	})
+
+	form.AddButton("Cancel", returnToMain)
+
+	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEscape {
+			returnToMain()
+			return nil
+		}
+		return event
+	})
+
+	warningView := tview.NewTextView().
+		SetDynamicColors(true).
+		SetText("Warning: Saving these changes will stop, remove, and recreate this container. Any files outside the project mount and named virtual volumes will be lost.")
+	warningView.SetTextColor(defaultTextColor).
+		SetBorderPadding(0, 0, 1, 1)
+
+	// calculate required dimensions
+	const formHorizontalPadding = 8
+	formHeight := formFullHeight(form)
+	warningHeight := 3
+	errHeight := 1
+	contentHeight := formHeight + warningHeight + errHeight
+	if maxH := t.maxContentHeight(); maxH > 0 && contentHeight > maxH {
+		contentHeight = maxH
+		formHeight = max(formHeight-3, contentHeight-warningHeight-errHeight)
+	}
+	contentWidth := max(
+		utf8.RuneCountInString("Project mount")+3,
+		utf8.RuneCountInString("Ports")+50,
+		utf8.RuneCountInString("Virtual volumes")+50,
+		utf8.RuneCountInString("Env files")+50,
+	) + formHorizontalPadding
+
+	// create content container with fixed height
+	contentFlex := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(form, formHeight, 0, true).
+		AddItem(warningView, warningHeight, 0, false).
+		AddItem(errView, errHeight, 0, false)
+
+	flex := t.centerOnScreen(contentFlex, contentWidth, contentHeight)
+
+	return flex, form
 }
 
 func (t *TUI) newCreateView() (*tview.Flex, *tview.Form) {
@@ -530,11 +668,63 @@ func (t *TUI) newCreateView() (*tview.Flex, *tview.Form) {
 		return event
 	})
 
-	flex := tview.NewFlex().SetDirection(tview.FlexRow).
-		AddItem(form, 0, 1, true).
-		AddItem(errView, 1, 0, false)
+	// calculate required dimensions
+	const formHorizontalPadding = 8
+	maxProfileNameLen := 0
+	for _, name := range profileNames {
+		if l := utf8.RuneCountInString(name); l > maxProfileNameLen {
+			maxProfileNameLen = l
+		}
+	}
+	formHeight := formFullHeight(form)
+	errHeight := 1
+	contentHeight := formHeight + errHeight
+	if maxH := t.maxContentHeight(); maxH > 0 && contentHeight > maxH {
+		contentHeight = maxH
+		formHeight = max(formHeight-3, contentHeight-errHeight)
+	}
+	contentWidth := max(
+		utf8.RuneCountInString("Profile")+maxProfileNameLen,
+		utf8.RuneCountInString("Project path")+50,
+		utf8.RuneCountInString("Project mount")+3,
+		utf8.RuneCountInString("Shell")+20,
+	) + formHorizontalPadding
+
+	// create content container with fixed height
+	contentFlex := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(form, formHeight, 0, true).
+		AddItem(errView, errHeight, 0, false)
+
+	flex := t.centerOnScreen(contentFlex, contentWidth, contentHeight)
 
 	return flex, form
+}
+
+// Returns the full non-scrollable height of a vertical form.
+func formFullHeight(form *tview.Form) int {
+	return form.GetFormItemCount()*2 + 5
+}
+
+// Wraps a content flex in spacers to center it both vertically and horizontally.
+func (t *TUI) centerOnScreen(content *tview.Flex, width, height int) *tview.Flex {
+	verticalFlex := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(tview.NewBox(), 0, 1, false).
+		AddItem(content, height, 0, true).
+		AddItem(tview.NewBox(), 0, 1, false)
+
+	return tview.NewFlex().
+		AddItem(tview.NewBox(), 0, 1, false).
+		AddItem(verticalFlex, width, 0, true).
+		AddItem(tview.NewBox(), 0, 1, false)
+}
+
+// Returns the n% of the terminal height, or 0 if it has not been measured yet.
+func (t *TUI) maxContentHeight() int {
+	if t.screenHeight == 0 {
+		return 0
+	}
+	maxH := int(float64(t.screenHeight) * defaultMaxContentHeight)
+	return maxH
 }
 
 func (t *TUI) collectProfiles() {
@@ -578,7 +768,7 @@ func (t *TUI) newRemoveConfirmModal(containerName string, container *manager.Con
 		if buttonIndex == 0 { // "Remove"
 			spec, err := manager.LoadSpec(container.ProjectPath, containerName)
 			if err != nil {
-				t.showErrror(fmt.Sprintf("Error: could not load spec: %s", err))
+				t.showError(fmt.Sprintf("Error: could not load spec: %s", err))
 				t.Pages.SwitchToPage("main")
 				t.App.SetFocus(t.ContainerTable)
 				return
@@ -626,7 +816,7 @@ func (t *TUI) cleanNotification() {
 	t.notifSetAt = time.Time{}
 }
 
-func (t *TUI) showErrror(text string) {
+func (t *TUI) showError(text string) {
 	t.NotificationView.SetText(text).SetTextColor(errorNotificationColor)
 	t.notifSetAt = time.Now()
 }

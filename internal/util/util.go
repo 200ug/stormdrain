@@ -5,6 +5,8 @@ import (
 	"math/rand/v2"
 	"os"
 	"path/filepath"
+	"strings"
+	"unicode"
 )
 
 const VersionCode = "v2.1 (2026-05-08)"
@@ -367,4 +369,13 @@ func CopyFile(src, dst string) error {
 		return err
 	}
 	return os.WriteFile(dst, data, 0755)
+}
+
+func StripAllWhitespace(str string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return -1
+		}
+		return r
+	}, str)
 }
