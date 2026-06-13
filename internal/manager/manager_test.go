@@ -567,6 +567,94 @@ func TestCleanupStagedConfigs_NoConfigsDirIsNoop(t *testing.T) {
 	}
 }
 
+func TestRemoveContainerDirs_RemovesParentWhenLastContainerRemoved(t *testing.T) {
+	projectDir := t.TempDir()
+	containerName := "proj-atomics"
+
+	sdDir := filepath.Join(projectDir, ".stormdrain")
+	containerDir := filepath.Join(sdDir, containerName)
+	if err := os.MkdirAll(containerDir, 0755); err != nil {
+		t.Fatalf("failed to create container dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(containerDir, "pod_spec.json"), []byte("{}"), 0644); err != nil {
+		t.Fatalf("failed to write dummy spec: %v", err)
+	}
+
+	if err := removeContainerDirs(projectDir, containerName); err != nil {
+		t.Fatalf("removeContainerDirs failed: %v", err)
+	}
+
+	if _, err := os.Stat(containerDir); err == nil {
+		t.Errorf("container dir should have been removed: %q", containerDir)
+	}
+	if _, err := os.Stat(sdDir); err == nil {
+		t.Errorf("parent .stormdrain dir should have been removed when empty: %q", sdDir)
+	}
+}
+
+func TestRemoveContainerDirs_KeepsParentWhenOtherContainersRemain(t *testing.T) {
+	projectDir := t.TempDir()
+	container1 := "proj-atomics"
+	container2 := "proj-sietch"
+
+	sdDir := filepath.Join(projectDir, ".stormdrain")
+	containerDir1 := filepath.Join(sdDir, container1)
+	containerDir2 := filepath.Join(sdDir, container2)
+	if err := os.MkdirAll(containerDir1, 0755); err != nil {
+		t.Fatalf("failed to create container dir 1: %v", err)
+	}
+	if err := os.MkdirAll(containerDir2, 0755); err != nil {
+		t.Fatalf("failed to create container dir 2: %v", err)
+	}
+
+	if err := removeContainerDirs(projectDir, container1); err != nil {
+		t.Fatalf("removeContainerDirs failed: %v", err)
+	}
+
+	if _, err := os.Stat(containerDir1); err == nil {
+		t.Errorf("container1 dir should have been removed: %q", containerDir1)
+	}
+	if _, err := os.Stat(containerDir2); err != nil {
+		t.Errorf("container2 dir should still exist: %q", containerDir2)
+	}
+	if _, err := os.Stat(sdDir); err != nil {
+		t.Errorf("parent .stormdrain dir should still exist while other containers remain: %q", sdDir)
+	}
+}
+
+func TestRemoveContainerDirs_KeepsParentWhenStrayFilesRemain(t *testing.T) {
+	projectDir := t.TempDir()
+	containerName := "proj-mentat"
+
+	sdDir := filepath.Join(projectDir, ".stormdrain")
+	containerDir := filepath.Join(sdDir, containerName)
+	if err := os.MkdirAll(containerDir, 0755); err != nil {
+		t.Fatalf("failed to create container dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(sdDir, "keepme.txt"), []byte("keep"), 0644); err != nil {
+		t.Fatalf("failed to write stray file: %v", err)
+	}
+
+	if err := removeContainerDirs(projectDir, containerName); err != nil {
+		t.Fatalf("removeContainerDirs failed: %v", err)
+	}
+
+	if _, err := os.Stat(containerDir); err == nil {
+		t.Errorf("container dir should have been removed: %q", containerDir)
+	}
+	if _, err := os.Stat(sdDir); err != nil {
+		t.Errorf("parent .stormdrain dir should still exist when stray files remain: %q", sdDir)
+	}
+}
+
+func TestRemoveContainerDirs_MissingDirsIsNoop(t *testing.T) {
+	projectDir := t.TempDir()
+
+	if err := removeContainerDirs(projectDir, "does-not-exist"); err != nil {
+		t.Fatalf("removeContainerDirs on missing dirs should be a no-op, got: %v", err)
+	}
+}
+
 func boolPtr(b bool) *bool {
 	return &b
 }
