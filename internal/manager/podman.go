@@ -114,6 +114,7 @@ type containerPs struct {
 	ImageTag  string `json:"Image"`
 	Labels    struct {
 		ProjectPath string `json:"stormdrain.project-path"`
+		ProfileName string `json:"stormdrain.profile-name"`
 	} `json:"Labels"`
 	Mounts []string `json:"Mounts"`
 	Ports  []portPs `json:"Ports"`
@@ -180,6 +181,7 @@ func getStormdrainContainers() ([]Container, error) {
 type Spec struct {
 	ContainerName  string            `json:"container_name"`
 	Hostname       string            `json:"hostname"`
+	ProfileName    string            `json:"-"`
 	ImageTag       string            `json:"image_tag"`
 	Shell          string            `json:"shell"`
 	ProjectPath    string            `json:"project_path"`
@@ -208,6 +210,7 @@ func NewSpecWithContainerName(profile *Profile, projectPath, containerName, host
 	spec := &Spec{
 		ContainerName: containerName,
 		Hostname:      hostname,
+		ProfileName:   profile.Name,
 		ImageTag:      fmt.Sprintf("stormdrain-%s-%s", profile.Name, projectName),
 		Shell:         shell,
 		ProjectPath:   projectPath,
@@ -289,6 +292,7 @@ func (s *Spec) CreateContainer() error {
 		"--hostname", s.Hostname,
 		"--label", "stormdrain",
 		"--label", fmt.Sprintf("stormdrain.project-path=%s", s.ProjectPath),
+		"--label", fmt.Sprintf("stormdrain.profile-name=%s", s.ProfileName),
 	}
 	if !IsDarwin() {
 		// map host UID to the same UID inside the container ("dev" instead of "root")

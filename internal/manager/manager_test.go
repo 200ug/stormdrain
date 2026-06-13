@@ -106,6 +106,24 @@ func TestNewSpecWithContainerName_ImageTag(t *testing.T) {
 	}
 }
 
+func TestNewSpecWithContainerName_ProfileName(t *testing.T) {
+	projectPath := "/tmp/testproject"
+	profile := &Profile{
+		Name:         "golang",
+		Shell:        "/bin/zsh",
+		ProjectMount: boolPtr(true),
+	}
+
+	spec, err := NewSpecWithContainerName(profile, projectPath, "testproj-mentat", "mentat")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if spec.ProfileName != "golang" {
+		t.Errorf("ProfileName: got %q, want %q", spec.ProfileName, "golang")
+	}
+}
+
 func TestWriteToDisk_WritesToContainerScopedPath(t *testing.T) {
 	projectDir := t.TempDir()
 	containerName := "myproject-atomics"
@@ -554,6 +572,37 @@ func TestLoadSpec_RequiresContainerName(t *testing.T) {
 	_, err := LoadSpec(projectDir, "")
 	if err == nil {
 		t.Error("expected error when containerName is empty, got nil")
+	}
+}
+
+func TestNewContainer_ProfileNameFromLabel(t *testing.T) {
+	ps := containerPs{
+		ID:        "abc123def456",
+		State:     "running",
+		StartedAt: 1234567890,
+		ImageTag:  "stormdrain-golang-myproject",
+	}
+	ps.Labels.ProjectPath = "/tmp/myproject"
+	ps.Labels.ProfileName = "golang"
+
+	stats := &containerStats{
+		ID:                   "abc123def456",
+		Name:                 "myproject-atomics",
+		CPUDirectPercentage:  "10.00%",
+		CPUAveragePercentage: "5.00%",
+		MemoryPercentage:     "20.00%",
+		NetworkIO:            "1kB / 2kB",
+	}
+
+	c := NewContainer(ps, stats)
+	if c.ProfileName != "golang" {
+		t.Errorf("ProfileName: got %q, want %q", c.ProfileName, "golang")
+	}
+	if c.ProjectPath != "/tmp/myproject" {
+		t.Errorf("ProjectPath: got %q, want %q", c.ProjectPath, "/tmp/myproject")
+	}
+	if c.Name != "myproject-atomics" {
+		t.Errorf("Name: got %q, want %q", c.Name, "myproject-atomics")
 	}
 }
 

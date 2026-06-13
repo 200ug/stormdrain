@@ -17,6 +17,7 @@ type Container struct {
 
 	ImageTag    string
 	ProjectPath string // from label
+	ProfileName string // from label
 	Mounts      []string
 	Ports       []portPs
 }
@@ -26,6 +27,7 @@ func NewContainer(ps containerPs, stats *containerStats) Container {
 		Name:        "-",
 		ImageTag:    ps.ImageTag,
 		ProjectPath: ps.Labels.ProjectPath,
+		ProfileName: ps.Labels.ProfileName,
 		Mounts:      ps.Mounts,
 		Ports:       ps.Ports,
 	}

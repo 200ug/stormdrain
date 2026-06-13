@@ -327,7 +327,7 @@ func (t *TUI) updateContainerTable() {
 		return containers[i].Name < containers[j].Name
 	})
 
-	headers := []string{"Name", "Status", "CPU (dir/avg)", "Memory"}
+	headers := []string{"Name", "Profile", "Status", "CPU (dir/avg)", "Memory"}
 	for i, h := range headers {
 		cell := tview.NewTableCell(h).
 			SetSelectable(false).
@@ -337,7 +337,7 @@ func (t *TUI) updateContainerTable() {
 	}
 
 	for i, c := range containers {
-		data := []string{c.Name, c.StatusString(), c.CPU, c.Memory}
+		data := []string{c.Name, c.ProfileName, c.StatusString(), c.CPU, c.Memory}
 		for col, text := range data {
 			color := defaultTextColor
 			if c.UptimeSec == -1 {
