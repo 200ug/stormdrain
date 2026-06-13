@@ -181,7 +181,7 @@ func getStormdrainContainers() ([]Container, error) {
 type Spec struct {
 	ContainerName  string            `json:"container_name"`
 	Hostname       string            `json:"hostname"`
-	ProfileName    string            `json:"-"`
+	ProfileName    string            `json:"profile_name"`
 	ImageTag       string            `json:"image_tag"`
 	Shell          string            `json:"shell"`
 	ProjectPath    string            `json:"project_path"`
@@ -246,6 +246,9 @@ func LoadSpec(projectPath, containerName string) (*Spec, error) {
 	if err = json.Unmarshal(rawContents, &s); err != nil {
 		return nil, err
 	}
+	// recompute values in order to support container recreation
+	s.BuildCtx = filepath.Join(s.ProjectPath, ".stormdrain", s.ContainerName)
+	s.ConfigsDir = filepath.Join(s.BuildCtx, "configs")
 	return &s, nil
 }
 
@@ -254,6 +257,7 @@ func LoadSpec(projectPath, containerName string) (*Spec, error) {
 // Regardless of the command's success, the podman commands' output will be logged
 // into project's .stormdrain/build.log (build context) for debugging purposes.
 func (s *Spec) CreateContainer() error {
+	// open log file, write header
 	logPath := filepath.Join(s.BuildCtx, "build.log")
 	logFile, err := os.Create(logPath) // O_TRUNC -> always overrides
 	if err != nil {
@@ -266,7 +270,62 @@ func (s *Spec) CreateContainer() error {
 	fmt.Fprintf(logFile, "Image: %s\n", s.ImageTag)
 	fmt.Fprintf(logFile, "Project: %s\n", s.ProjectPath)
 
-	// 1. build image from generated template
+	if err := s.buildImage(logFile); err != nil {
+		return err
+	}
+	if err := s.runContainer(logFile); err != nil {
+		return err
+	}
+
+	// persist (full) config to local disk
+	return s.WriteToDisk()
+}
+
+func (s *Spec) RecreateContainer() error {
+	logPath := filepath.Join(s.BuildCtx, "recreate.log") // separate from build.log
+	logFile, err := os.Create(logPath)
+	if err != nil {
+		return fmt.Errorf("could not create recreate log file: %w", err)
+	}
+	defer logFile.Close()
+
+	fmt.Fprintf(logFile, "### CONTAINER RECREATE LOG ###\n")
+	fmt.Fprintf(logFile, "Timestamp: %s\n", time.Now().Format("2006-01-02 15:04:05"))
+	fmt.Fprintf(logFile, "Image: %s\n", s.ImageTag)
+	fmt.Fprintf(logFile, "Project: %s\n", s.ProjectPath)
+
+	// 1. build image only if it doesn't already exist
+	if !imageExists(s.ImageTag) {
+		if err := s.buildImage(logFile); err != nil {
+			return err
+		}
+	} else {
+		fmt.Fprintf(logFile, "Reusing existing image %s\n", s.ImageTag)
+	}
+
+	// 2. stop and remove the old container instance
+	exists, isRunning := containerExists(s.ContainerName)
+	if exists {
+		if isRunning {
+			if err := stopContainer(s.ContainerName, false); err != nil {
+				return err
+			}
+		}
+		if err := removeContainer(s.ContainerName); err != nil {
+			return err
+		}
+	}
+
+	// 3. run a new container with the updated spec
+	if err := s.runContainer(logFile); err != nil {
+		return err
+	}
+
+	// 4. persist the updated spec
+	return s.WriteToDisk()
+}
+
+func (s *Spec) buildImage(logFile *os.File) error {
 	buildArgs := []string{
 		"build",
 		"-t", s.ImageTag,
@@ -279,12 +338,11 @@ func (s *Spec) CreateContainer() error {
 	buildCmd := exec.Command("podman", buildArgs...)
 	buildCmd.Stdout = logFile
 	buildCmd.Stderr = logFile
-	err = buildCmd.Run()
-	if err != nil {
-		return err
-	}
+	return buildCmd.Run()
+}
 
-	// 2. run using built image
+func (s *Spec) runContainer(logFile *os.File) error {
+	// run using built image
 	runArgs := []string{
 		"run",
 		"-d",
@@ -316,15 +374,10 @@ func (s *Spec) CreateContainer() error {
 	}
 	runArgs = append(runArgs, s.ImageTag)
 	runCmd := exec.Command("podman", runArgs...)
-	fmt.Fprintf(logFile, "\n### CONTAINER RUN (CREATE) LOG ###\n")
+	fmt.Fprintf(logFile, "\n### CONTAINER CREATE LOG ###\n")
 	runCmd.Stdout = logFile
 	runCmd.Stderr = logFile
-	if err := runCmd.Run(); err != nil {
-		return err
-	}
-
-	// 3. persist the image to host disk
-	return s.WriteToDisk()
+	return runCmd.Run()
 }
 
 // Writes the file as formatted JSON to .stormdrain/pod_spec.json of the project.
@@ -473,4 +526,9 @@ func UniqueContainerName(projectName string) (string, string) {
 		}
 	}
 	return containerName, hostname
+}
+
+func imageExists(imageTag string) bool {
+	_, err := exec.Command("podman", "image", "inspect", imageTag, "--format", "{{.Id}}").Output()
+	return err == nil
 }

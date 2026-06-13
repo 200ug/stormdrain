@@ -8,6 +8,7 @@ type CommandType int
 
 const (
 	Create CommandType = iota
+	Recreate
 	Attach
 	Stop
 	Remove
@@ -28,6 +29,8 @@ func (c *Command) Execute() error {
 		//		 handled substitution into Dockerfile, and staged the user configs
 		defer CleanupStagedConfigs(c.Spec.ProjectPath, c.Spec.ContainerName)
 		return c.Spec.CreateContainer() // builds, starts, and persists
+	case Recreate:
+		return c.Spec.RecreateContainer() // removes old and starts new
 	case Attach:
 		return c.Spec.AttachIntoContainer()
 	case Stop:
@@ -45,6 +48,8 @@ func (c *Command) NotificationPrint() string {
 	switch c.Type {
 	case Create:
 		return "Container created successfully"
+	case Recreate:
+		return "Container recreated successfully"
 	case Attach:
 		// NOTE: this case should never happend, as attaching is handled
 		//		 completely TUI-side (due to app.Suspend)
