@@ -569,7 +569,7 @@ func (t *TUI) collectProfiles() {
 
 func (t *TUI) newRemoveConfirmModal(containerName string, container *manager.Container) *tview.Modal {
 	modal := tview.NewModal().
-		SetText(fmt.Sprintf("Remove container %s?\nThis will also delete its image and .stormdrain/ directory.", containerName)).
+		SetText(fmt.Sprintf("Remove container %s?\nThis will also delete its image and container data under .stormdrain/ directory.", containerName)).
 		AddButtons([]string{"Remove", "Cancel"}).
 		SetTextColor(defaultTextColor).
 		SetBackgroundColor(modalBgColor)
