@@ -9,7 +9,7 @@ import (
 	"unicode"
 )
 
-const VersionCode = "v2.1 (2026-05-08)"
+const VersionCode = "v2.2 (2026-06-13)"
 
 var Hostnames = []string{
 	"atomics",
