@@ -53,7 +53,7 @@ func LoadProfileFromPath(path string) (*Profile, error) {
 
 // Substitutes the profile's configuration into the base Dockerfile and writes the
 // resulting Dockerfile to project's .stormdrain/ directory as Dockerfile.sd.
-func (p *Profile) SubstituteDockerfileTemplate(configsDir, projectPath string) error {
+func (p *Profile) SubstituteDockerfileTemplate(configsDir, projectPath, containerName string) error {
 	templatePath := filepath.Join(configsDir, "Dockerfile.base")
 	dfTemplate, err := os.ReadFile(templatePath)
 	if err != nil {
@@ -65,7 +65,7 @@ func (p *Profile) SubstituteDockerfileTemplate(configsDir, projectPath string) e
 	dfSubst = strings.Replace(dfSubst, "# {{PROFILE_CONFIGS}}\n", p.buildConfigsBlock(), 1)
 	dfSubst = strings.Replace(dfSubst, "# {{PROFILE_DIRS}}\n", p.buildDirsBlock(projectName), 1)
 
-	sdDir := filepath.Join(projectPath, ".stormdrain")
+	sdDir := filepath.Join(projectPath, ".stormdrain", containerName)
 	if err := os.MkdirAll(sdDir, 0755); err != nil {
 		return err
 	}
@@ -139,12 +139,12 @@ func (p *Profile) buildConfigsBlock() string {
 // the existence of the files it writes to COPY commands.
 //
 // E.g. ~/.config/nvim becomes $projectPath/.stormdrain/configs/.config/nvim
-func (p *Profile) StageConfigs(userHome, projectPath string) error {
+func (p *Profile) StageConfigs(userHome, projectPath, containerName string) error {
 	if len(p.Configs) == 0 {
 		return nil
 	}
 
-	tmpConfigsDir := filepath.Join(projectPath, ".stormdrain", "configs")
+	tmpConfigsDir := filepath.Join(projectPath, ".stormdrain", containerName, "configs")
 	if err := os.MkdirAll(tmpConfigsDir, 0755); err != nil {
 		return err
 	}
@@ -193,8 +193,8 @@ func (p *Profile) handleGlobMatchCopy(userHome, tmpConfigsDir, match string, exc
 	return nil
 }
 
-func CleanupStagedConfigs(projectPath string) error {
-	return os.RemoveAll(filepath.Join(projectPath, ".stormdrain", "configs"))
+func CleanupStagedConfigs(projectPath, containerName string) error {
+	return os.RemoveAll(filepath.Join(projectPath, ".stormdrain", containerName, "configs"))
 }
 
 func decodeProfile(path string) (*Profile, error) {

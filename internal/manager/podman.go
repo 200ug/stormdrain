@@ -192,7 +192,7 @@ type Spec struct {
 	EnvFiles       []string          `json:"env_files"`
 }
 
-func NewSpec(profile *Profile, projectPath string) (*Spec, error) {
+func NewSpecWithContainerName(profile *Profile, projectPath, containerName, hostname string) (*Spec, error) {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
@@ -200,7 +200,6 @@ func NewSpec(profile *Profile, projectPath string) (*Spec, error) {
 	uid := os.Getuid()
 	gid := os.Getgid()
 	projectName := filepath.Base(projectPath)
-	containerName, hostname := uniqueContainerName(projectName)
 	shell := profile.Shell
 	if shell == "" {
 		shell = DefaultShell
@@ -213,8 +212,10 @@ func NewSpec(profile *Profile, projectPath string) (*Spec, error) {
 		Shell:         shell,
 		ProjectPath:   projectPath,
 		ProjectMount:  profile.ProjectMount == nil || *profile.ProjectMount,
-		BuildCtx:      filepath.Join(projectPath, ".stormdrain"),
-		ConfigsDir:    filepath.Join(projectPath, ".stormdrain", "configs"),
+		// NOTE: scoping with containerName necessary to facilitate multiple containers
+		//		 in the same project space (i.e. in the same .stormdrain directory)
+		BuildCtx:   filepath.Join(projectPath, ".stormdrain", containerName),
+		ConfigsDir: filepath.Join(projectPath, ".stormdrain", containerName, "configs"),
 		BuildArgs: map[string]string{
 			"UID": strconv.Itoa(uid),
 			"GID": strconv.Itoa(gid),
@@ -232,8 +233,8 @@ func NewSpec(profile *Profile, projectPath string) (*Spec, error) {
 	return spec, nil
 }
 
-func LoadSpec(projectPath string) (*Spec, error) {
-	specPath := filepath.Join(projectPath, ".stormdrain", "pod_spec.json")
+func LoadSpec(projectPath, containerName string) (*Spec, error) {
+	specPath := filepath.Join(projectPath, ".stormdrain", containerName, "pod_spec.json")
 	rawContents, err := os.ReadFile(specPath)
 	if err != nil {
 		return nil, err
@@ -328,7 +329,7 @@ func (s *Spec) WriteToDisk() error {
 	if err != nil {
 		return err
 	}
-	specPath := filepath.Join(s.ProjectPath, ".stormdrain", "pod_spec.json")
+	specPath := filepath.Join(s.BuildCtx, "pod_spec.json")
 	return os.WriteFile(specPath, formattedJson, 0644)
 }
 
@@ -349,7 +350,7 @@ func (s *Spec) RemoveContainer() error {
 	if err := removeImage(s.ImageTag); err != nil {
 		return err
 	}
-	return os.RemoveAll(filepath.Join(s.ProjectPath, ".stormdrain"))
+	return os.RemoveAll(filepath.Join(s.ProjectPath, ".stormdrain", s.ContainerName))
 }
 
 func (s *Spec) AttachIntoContainer() error {
@@ -437,7 +438,7 @@ func removeImage(imageTag string) error {
 }
 
 // Randomize container name's suffix (hostname) to find a unique container name.
-func uniqueContainerName(projectName string) (string, string) {
+func UniqueContainerName(projectName string) (string, string) {
 	var containerName, hostname string
 	for {
 		hostname = util.RandomHostname()

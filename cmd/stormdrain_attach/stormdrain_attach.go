@@ -17,11 +17,12 @@ func main() {
 		log.Fatalf("%v", err.Error())
 	}
 
-	projectPath, err := manager.ContainerProjectPath(os.Args[1])
+	containerName := os.Args[1]
+	projectPath, err := manager.ContainerProjectPath(containerName)
 	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}
-	spec, err := manager.LoadSpec(projectPath)
+	spec, err := manager.LoadSpec(projectPath, containerName)
 	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}

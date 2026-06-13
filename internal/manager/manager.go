@@ -104,7 +104,7 @@ func (m *Manager) handlePurgeCommand(cmd Command) {
 	var purgeErr error
 	volumeNames := make(map[string]any)
 	for _, c := range containers {
-		spec, err := LoadSpec(c.ProjectPath)
+		spec, err := LoadSpec(c.ProjectPath, c.Name)
 		if err != nil {
 			purgeErr = err
 			break

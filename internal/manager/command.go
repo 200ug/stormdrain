@@ -26,7 +26,7 @@ func (c *Command) Execute() error {
 	case Create:
 		// NOTE: at this point we should've already loaded the profile config,
 		//		 handled substitution into Dockerfile, and staged the user configs
-		defer CleanupStagedConfigs(c.Spec.ProjectPath)
+		defer CleanupStagedConfigs(c.Spec.ProjectPath, c.Spec.ContainerName)
 		return c.Spec.CreateContainer() // builds, starts, and persists
 	case Attach:
 		return c.Spec.AttachIntoContainer()

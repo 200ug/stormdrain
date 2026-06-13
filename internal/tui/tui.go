@@ -131,7 +131,7 @@ func NewTUI(m *manager.Manager, versionCode string) *TUI {
 				tui.showErrror("Error: no container selected")
 				return nil
 			}
-			spec, err := manager.LoadSpec(container.ProjectPath)
+			spec, err := manager.LoadSpec(container.ProjectPath, container.Name)
 			if err != nil {
 				tui.showErrror(fmt.Sprintf("Error: could not load spec: %s", err))
 				return nil
@@ -146,7 +146,7 @@ func NewTUI(m *manager.Manager, versionCode string) *TUI {
 				tui.showErrror("Error: no container selected")
 				return nil
 			}
-			spec, err := manager.LoadSpec(container.ProjectPath)
+			spec, err := manager.LoadSpec(container.ProjectPath, container.Name)
 			if err != nil {
 				tui.showErrror(fmt.Sprintf("Error: could not load spec: %s", err))
 				return nil
@@ -176,7 +176,7 @@ func NewTUI(m *manager.Manager, versionCode string) *TUI {
 				tui.showErrror("Error: no container selected")
 				return nil
 			}
-			spec, err := manager.LoadSpec(container.ProjectPath)
+			spec, err := manager.LoadSpec(container.ProjectPath, container.Name)
 			if err != nil {
 				tui.showErrror(fmt.Sprintf("Error: could not load spec: %s", err))
 				return nil
@@ -485,21 +485,24 @@ func (t *TUI) newCreateView() (*tview.Flex, *tview.Form) {
 			return
 		}
 
+		// create container name first for directory scoping
+		containerName, hostname := manager.UniqueContainerName(filepath.Base(absProjectPath))
+
 		// 2. substitute profile values to dockerfile template
 		configsDir := filepath.Join(t.UserHome, ".config", "stormdrain")
-		if err := selectedProfile.SubstituteDockerfileTemplate(configsDir, absProjectPath); err != nil {
+		if err := selectedProfile.SubstituteDockerfileTemplate(configsDir, absProjectPath, containerName); err != nil {
 			errView.SetText(fmt.Sprintf("Dockerfile substitution failed: %s", err)).SetTextColor(errorNotificationColor)
 			return
 		}
 
 		// 3. stage configs temporarily to .stormdrain/configs
-		if err := selectedProfile.StageConfigs(t.UserHome, absProjectPath); err != nil {
+		if err := selectedProfile.StageConfigs(t.UserHome, absProjectPath, containerName); err != nil {
 			errView.SetText(fmt.Sprintf("Config staging failed: %s", err)).SetTextColor(errorNotificationColor)
 			return
 		}
 
-		// 4. create spec profile and apply potential overrides
-		spec, err := manager.NewSpec(selectedProfile, absProjectPath)
+		// 4. create spec profile (with previously generated containerName/hostname) and apply potential overrides
+		spec, err := manager.NewSpecWithContainerName(selectedProfile, absProjectPath, containerName, hostname)
 		if err != nil {
 			errView.SetText(fmt.Sprintf("Could not create spec: %s", err)).SetTextColor(errorNotificationColor)
 			return
@@ -511,7 +514,7 @@ func (t *TUI) newCreateView() (*tview.Flex, *tview.Form) {
 
 		// 5. send create command to backend manager (handles CreateContainer + WriteToDisk + CleanupStagedConfigs)
 		t.DataManager.CmdChan <- manager.Command{Type: manager.Create, Spec: *spec}
-		t.showNotification("Creating container...", true)
+		t.showNotification(fmt.Sprintf("Creating container '%s'...", hostname), true)
 
 		t.Pages.SwitchToPage("main")
 		t.App.SetFocus(t.ContainerTable)
@@ -573,7 +576,7 @@ func (t *TUI) newRemoveConfirmModal(containerName string, container *manager.Con
 	modal.SetBorderColor(modalBorderColor)
 	modal.SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 		if buttonIndex == 0 { // "Remove"
-			spec, err := manager.LoadSpec(container.ProjectPath)
+			spec, err := manager.LoadSpec(container.ProjectPath, containerName)
 			if err != nil {
 				t.showErrror(fmt.Sprintf("Error: could not load spec: %s", err))
 				t.Pages.SwitchToPage("main")
