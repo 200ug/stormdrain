@@ -40,11 +40,12 @@ Project binaries can be built into `bin/` with `scripts/build.sh`. Out of these 
 
 TUI keyboard mappings:
 
-|  Mapping | Action |
+|  Key | Action |
 | - | - |
-| `j`, `k` | Navigation |
+| `j/k` | Navigation (down/up) |
 | `q` | Quit |
 | `n` | New container (via form) |
+| `e` | Edit container config (ports, volumes, env files, project mount) |
 | `s` | Stop selected container |
 | `x` | Kill (force stop) selected container |
 | `d` | Removed selected container |
